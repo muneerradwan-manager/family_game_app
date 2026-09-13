@@ -1,0 +1,89 @@
+name: family_game_app
+description: "منصّة ألعاب عائلية لحظية — اللعبة الأولى: لعبة الحروف."
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.12.1
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  # إدارة الحالة
+  flutter_bloc: ^9.1.1
+  equatable: ^2.1.0
+
+  # التنقل
+  go_router: ^18.0.1
+
+  # الشبكة
+  dio: ^5.11.1
+
+  # القناة الحيّة — نتكلم بروتوكول Pusher مباشرة فوق WebSocket.
+  # حزمة pusher الرسمية لم تعد تقبل مضيفاً مخصّصاً، وReverb يعمل على مضيفنا.
+  web_socket_channel: ^3.0.3
+
+  # التخزين المحلي
+  flutter_secure_storage: ^11.0.0
+  shared_preferences: ^2.5.5
+
+  # اللمسات الحسّية: صوت التكّة والستوب
+  audioplayers: ^6.8.1
+
+  # مشاركة النتيجة كصورة
+  share_plus: ^13.3.0
+  path_provider: ^2.1.6
+
+  # صور البروفايل والقنوات
+  image_picker: ^1.2.0
+
+  # إعدادات الاتصال من ملف .env بدل تعديل الكود
+  flutter_dotenv: ^6.0.1
+
+  intl: ^0.20.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  bloc_test: ^10.0.0
+  mocktail: ^1.0.4
+
+flutter:
+  uses-material-design: true
+  assets:
+    - .env
+    - assets/sounds/
+
+  fonts:
+    # Tajawal هو خط الواجهة: عربي أولاً، ويغطي اللاتيني بما يكفي.
+    - family: Tajawal
+      fonts:
+        - asset: assets/fonts/Tajawal-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Tajawal-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Tajawal-Bold.ttf
+          weight: 700
+
+    # Outfit للأرقام الكبيرة (العدّادات والنقاط): أوضح وأثبت عرضاً.
+    - family: Outfit
+      fonts:
+        - asset: assets/fonts/Outfit-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Outfit-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Outfit-Bold.ttf
+          weight: 700
+
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/Inter-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Inter-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Inter-Bold.ttf
+          weight: 700
