@@ -21,6 +21,19 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _obscure = true;
 
   @override
+  void initState() {
+    super.initState();
+
+    // سبب الخروج (جلسة انتهت، حساب موقوف) يُضبط قبل أن تُفتح هذه الشاشة،
+    // فلا يلتقطه المستمع — نعرضه مرة عند الفتح.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final error = mounted ? context.read<AuthCubit>().state.error : null;
+
+      if (error != null) showAppSnack(context, error, isError: true);
+    });
+  }
+
+  @override
   void dispose() {
     _phone.dispose();
     _password.dispose();

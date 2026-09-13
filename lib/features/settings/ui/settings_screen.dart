@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -220,21 +221,72 @@ class _ProfileCard extends StatelessWidget {
 }
 
 /// اختيار الثيم — تفضيل شخصي محفوظ على الجهاز، يتغيّر التطبيق كله فوراً.
-class _ThemePicker extends StatelessWidget {
+class _ThemePicker extends StatefulWidget {
   const _ThemePicker();
 
   @override
-  Widget build(BuildContext context) {
-    final current = context.watch<ThemeCubit>().state;
+  State<_ThemePicker> createState() => _ThemePickerState();
+}
 
+class _ThemePickerState extends State<_ThemePicker> {
+  final _controller = ScrollController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  /// عجلة الماوس عمودية، والقائمة أفقية: نحوّل الدوران إلى إزاحة أفقية،
+  /// وإلا لا يتحرك الشريط على ويندوز إلا بسحب شريط التمرير.
+  void _onWheel(PointerSignalEvent event) {
+    if (event is! PointerScrollEvent || !_controller.hasClients) return;
+
+    final delta = event.scrollDelta.dy != 0
+        ? event.scrollDelta.dy
+        : event.scrollDelta.dx;
+    final position = _controller.position;
+
+    if (delta == 0 || position.maxScrollExtent == 0) return;
+
+    // نلتقط الحدث فقط حين تتحرك القائمة فعلاً، فلا تتعطّل صفحة الإعدادات
+    // العمودية تحتها.
+    GestureBinding.instance.pointerSignalResolver.register(event, (_) {
+      _controller.jumpTo(
+        (position.pixels + delta).clamp(0.0, position.maxScrollExtent),
+      );
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final state = context.watch<ThemeCubit>().state;
+    final current = state.palette;
+
+    return Listener(
+      onPointerSignal: _onWheel,
+      child: Scrollbar(
+        controller: _controller,
+        thumbVisibility: true,
+        child: Padding(
+          // مكان شريط التمرير تحت البطاقات لا فوقها.
+          padding: const EdgeInsets.only(bottom: 12),
+          child: _list(state, current),
+        ),
+      ),
+    );
+  }
+
+  Widget _list(ThemeState state, AppPalette current) {
     return SizedBox(
       height: 128,
       child: ListView.separated(
+        controller: _controller,
         scrollDirection: Axis.horizontal,
-        itemCount: appPalettes.length,
+        itemCount: state.palettes.length,
         separatorBuilder: (_, _) => const SizedBox(width: 12),
         itemBuilder: (context, index) {
-          final palette = appPalettes[index];
+          final palette = state.palettes[index];
           final selected = palette.id == current.id;
 
           return GestureDetector(

@@ -7,6 +7,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../core/media/image_upload_service.dart';
+import '../../../core/platform/platform_cubit.dart';
 import '../../../core/theme/app_palette.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/avatars.dart';
@@ -185,52 +186,86 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
-  Widget _accountStep(AuthState state) => Form(
-    key: _accountKey,
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        const SizedBox(height: 12),
-        TextFormField(
-          controller: _phone,
-          keyboardType: TextInputType.phone,
-          textDirection: TextDirection.ltr,
-          decoration: InputDecoration(
-            labelText: 'رقم الهاتف',
-            hintText: '07XXXXXXXX',
-            hintTextDirection: TextDirection.ltr,
-            prefixIcon: const Icon(Icons.phone_outlined),
-            errorText: state.fieldErrors['phone'],
-          ),
-          validator: (value) =>
-              (value ?? '').trim().length < 7 ? 'اكتب رقم هاتف صحيح' : null,
-        ),
-        const SizedBox(height: 14),
-        TextFormField(
-          controller: _password,
-          obscureText: _obscure,
-          decoration: InputDecoration(
-            labelText: 'كلمة السر',
-            helperText: '6 خانات على الأقل',
-            prefixIcon: const Icon(Icons.lock_outline),
-            suffixIcon: IconButton(
-              icon: Icon(
-                _obscure
-                    ? Icons.visibility_off_outlined
-                    : Icons.visibility_outlined,
+  Widget _accountStep(AuthState state) {
+    final platform = context.watch<PlatformCubit>().state;
+
+    return Form(
+      key: _accountKey,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // المشرف أغلق التسجيل: نقولها قبل أن يملأ المستخدم النموذج لا بعده.
+          if (!platform.registrationEnabled) ...[
+            SectionCard(
+              color: context.palette.accent.withValues(alpha: 0.12),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.lock_clock_outlined,
+                    color: context.palette.accent,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      platform.registrationMessage.isNotEmpty
+                          ? platform.registrationMessage
+                          : 'التسجيل مسكّر حالياً.',
+                      style: TextStyle(
+                        color: context.palette.textPrimary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              onPressed: () => setState(() => _obscure = !_obscure),
             ),
-            errorText: state.fieldErrors['password'],
+            const SizedBox(height: 8),
+          ],
+          const SizedBox(height: 12),
+          TextFormField(
+            controller: _phone,
+            keyboardType: TextInputType.phone,
+            textDirection: TextDirection.ltr,
+            decoration: InputDecoration(
+              labelText: 'رقم الهاتف',
+              hintText: '07XXXXXXXX',
+              hintTextDirection: TextDirection.ltr,
+              prefixIcon: const Icon(Icons.phone_outlined),
+              errorText: state.fieldErrors['phone'],
+            ),
+            validator: (value) =>
+                (value ?? '').trim().length < 7 ? 'اكتب رقم هاتف صحيح' : null,
           ),
-          validator: (value) =>
-              (value ?? '').length < 6 ? 'كلمة السر 6 خانات على الأقل' : null,
-        ),
-        const SizedBox(height: 26),
-        FilledButton(onPressed: _next, child: const Text('التالي')),
-      ],
-    ),
-  );
+          const SizedBox(height: 14),
+          TextFormField(
+            controller: _password,
+            obscureText: _obscure,
+            decoration: InputDecoration(
+              labelText: 'كلمة السر',
+              helperText: '6 خانات على الأقل',
+              prefixIcon: const Icon(Icons.lock_outline),
+              suffixIcon: IconButton(
+                icon: Icon(
+                  _obscure
+                      ? Icons.visibility_off_outlined
+                      : Icons.visibility_outlined,
+                ),
+                onPressed: () => setState(() => _obscure = !_obscure),
+              ),
+              errorText: state.fieldErrors['password'],
+            ),
+            validator: (value) =>
+                (value ?? '').length < 6 ? 'كلمة السر 6 خانات على الأقل' : null,
+          ),
+          const SizedBox(height: 26),
+          FilledButton(
+            onPressed: platform.registrationEnabled ? _next : null,
+            child: const Text('التالي'),
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _photoCircle(AppPalette palette) => GestureDetector(
     onTap: () async {

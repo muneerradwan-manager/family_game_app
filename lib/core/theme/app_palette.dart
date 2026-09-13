@@ -49,9 +49,82 @@ class AppPalette {
   final List<Color> headerGradient;
 
   Brightness get brightness => isDark ? Brightness.dark : Brightness.light;
+
+  /// ثيم من لوحة الإدارة (`AppTheme::toApi`).
+  ///
+  /// null لأي ثيم ناقص أو بلون تالف: ثيم بلون واحد خاطئ يرسم نصاً غير
+  /// مقروء، وتجاهله أسلم من عرضه.
+  static AppPalette? fromJson(Map<String, dynamic> json) {
+    final id = json['key'];
+    final name = json['name'];
+    final colors = json['colors'];
+
+    if (id is! String || id.isEmpty || name is! String || colors is! Map) {
+      return null;
+    }
+
+    Color? color(String key) {
+      final value = colors[key];
+
+      if (value is! String) return null;
+
+      final hex = value.replaceFirst('#', '');
+
+      if (!RegExp(r'^[0-9a-fA-F]{6}$').hasMatch(hex)) return null;
+
+      return Color(0xFF000000 | int.parse(hex, radix: 16));
+    }
+
+    final primary = color('primary');
+    final onPrimary = color('onPrimary');
+    final secondary = color('secondary');
+    final accent = color('accent');
+    final background = color('background');
+    final surface = color('surface');
+    final surfaceAlt = color('surfaceAlt');
+    final textPrimary = color('textPrimary');
+    final textMuted = color('textMuted');
+    final outline = color('outline');
+    final gradientStart = color('gradientStart');
+    final gradientEnd = color('gradientEnd');
+
+    if (primary == null ||
+        onPrimary == null ||
+        secondary == null ||
+        accent == null ||
+        background == null ||
+        surface == null ||
+        surfaceAlt == null ||
+        textPrimary == null ||
+        textMuted == null ||
+        outline == null ||
+        gradientStart == null ||
+        gradientEnd == null) {
+      return null;
+    }
+
+    return AppPalette(
+      id: id,
+      name: name,
+      tagline: json['tagline'] is String ? json['tagline'] as String : '',
+      isDark: json['isDark'] == true,
+      primary: primary,
+      onPrimary: onPrimary,
+      secondary: secondary,
+      accent: accent,
+      background: background,
+      surface: surface,
+      surfaceAlt: surfaceAlt,
+      textPrimary: textPrimary,
+      textMuted: textMuted,
+      outline: outline,
+      headerGradient: [gradientStart, gradientEnd],
+    );
+  }
 }
 
-/// كل الثيمات المتاحة. الأول هو الافتراضي.
+/// الثيمات المدمجة: الافتراضي قبل أول اتصال بالسيرفر، والاحتياط إن فشل.
+/// نسختها المعتمدة في لوحة الإدارة. الأول هو الافتراضي.
 const List<AppPalette> appPalettes = [
   AppPalette(
     id: 'sea_breeze',

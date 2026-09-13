@@ -140,6 +140,21 @@ class AuthCubit extends Cubit<AuthState> {
     );
   }
 
+  /// أوقف المشرف الحساب: يخرج فوراً من أي شاشة، ويرى السبب.
+  Future<void> banned(String message) async {
+    await _tokens.clear();
+    await _realtime.disconnect();
+
+    if (isClosed) return;
+
+    emit(
+      AuthState(
+        status: AuthStatus.unauthenticated,
+        error: message.isEmpty ? 'حسابك موقوف.' : message,
+      ),
+    );
+  }
+
   void clearError() => emit(state.copyWith(clearError: true));
 
   Future<bool> _guard(Future<AppUser> Function() action) async {

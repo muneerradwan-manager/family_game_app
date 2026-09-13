@@ -11,6 +11,29 @@ Widget _wrap(Widget child, {AppPalette? palette}) => MaterialApp(
   home: Scaffold(body: Center(child: child)),
 );
 
+Map<String, dynamic> _theme(String key, {String primary = '#1B7FA8'}) => {
+  'key': key,
+  'name': key,
+  'isDark': false,
+  'colors': {
+    for (final name in [
+      'onPrimary',
+      'secondary',
+      'accent',
+      'background',
+      'surface',
+      'surfaceAlt',
+      'textPrimary',
+      'textMuted',
+      'outline',
+      'gradientStart',
+      'gradientEnd',
+    ])
+      name: '#FFFFFF',
+    'primary': primary,
+  },
+};
+
 void main() {
   group('الثيمات', () {
     setUp(() => SharedPreferences.setMockInitialValues({}));
@@ -18,7 +41,8 @@ void main() {
     test('يبدأ بالثيم الافتراضي حين لا يوجد اختيار محفوظ', () async {
       final cubit = ThemeCubit(await SharedPreferences.getInstance());
 
-      expect(cubit.state.id, appPalettes.first.id);
+      expect(cubit.state.palette.id, appPalettes.first.id);
+      expect(cubit.state.palettes, appPalettes, reason: 'المدمجة قبل أي اتصال');
     });
 
     test('يحفظ الاختيار ويستعيده عند الإقلاع التالي', () async {
@@ -28,7 +52,59 @@ void main() {
       ThemeCubit(preferences).select(night);
 
       // نسخة جديدة تحاكي تشغيل التطبيق من جديد.
-      expect(ThemeCubit(preferences).state.id, 'night');
+      expect(ThemeCubit(preferences).state.palette.id, 'night');
+    });
+
+    test('ثيمات اللوحة تُحفظ ويفتح عليها التطبيق بلا شبكة', () async {
+      final preferences = await SharedPreferences.getInstance();
+
+      ThemeCubit(preferences).applyRemote([
+        _theme('ocean', primary: '#0A7BC2'),
+        _theme('sand'),
+      ], 'sand');
+
+      final restarted = ThemeCubit(preferences);
+
+      expect(restarted.state.palettes.map((p) => p.id), ['ocean', 'sand']);
+      expect(restarted.state.palette.id, 'sand');
+      expect(restarted.state.palettes.first.primary, const Color(0xFF0A7BC2));
+    });
+
+    test(
+      'الاختيار يبقى إن بقي ثيمه، ويرجع للافتراضي إن أخفاه المشرف',
+      () async {
+        final cubit = ThemeCubit(await SharedPreferences.getInstance());
+
+        cubit.applyRemote([_theme('ocean'), _theme('sand')], 'ocean');
+        cubit.select(cubit.state.palettes.last);
+
+        cubit.applyRemote([
+          _theme('ocean'),
+          _theme('sand', primary: '#000000'),
+        ], 'ocean');
+        expect(cubit.state.palette.id, 'sand');
+        expect(
+          cubit.state.palette.primary,
+          const Color(0xFF000000),
+          reason: 'ألوانه المحدّثة',
+        );
+
+        cubit.applyRemote([_theme('ocean')], 'ocean');
+        expect(cubit.state.palette.id, 'ocean');
+      },
+    );
+
+    test('ثيم بلون تالف يُتجاهل، وقائمة كلها تالفة لا تمسح الموجود', () async {
+      final cubit = ThemeCubit(await SharedPreferences.getInstance());
+
+      cubit.applyRemote([
+        _theme('ocean'),
+        _theme('broken', primary: 'red'),
+      ], null);
+      expect(cubit.state.palettes.map((p) => p.id), ['ocean']);
+
+      cubit.applyRemote([_theme('broken', primary: '#12')], null);
+      expect(cubit.state.palettes.map((p) => p.id), ['ocean']);
     });
 
     test('كل ثيم يعرّف لوحته كاملة ومعرّفه فريد', () {

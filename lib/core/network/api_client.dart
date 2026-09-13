@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
 import '../config/app_config.dart';
+import '../config/app_version.dart';
 import '../diagnostics/app_log.dart';
 import '../storage/token_store.dart';
 import 'api_exception.dart';
@@ -19,7 +20,8 @@ class ApiClient {
         baseUrl: AppConfig.apiBaseUrl,
         connectTimeout: const Duration(seconds: 10),
         receiveTimeout: const Duration(seconds: 15),
-        headers: {'Accept': 'application/json'},
+        // النسخة مع كل طلب: السيرفر يرد 426 لما هو أقدم من حدّ المشرف.
+        headers: {'Accept': 'application/json', 'X-App-Version': appVersion},
       ),
     );
 
@@ -39,6 +41,12 @@ class ApiClient {
 
   /// يُستدعى حين يفشل التجديد: انتهت الجلسة فعلاً ولا بد من دخول جديد.
   void Function()? onSessionExpired;
+
+  /// إشارات لوحة الإدارة — تصل من أي طلب، لا من شاشة بعينها.
+  void Function(String message)? onMaintenance;
+  void Function(String message, String? storeUrl, String? minVersion)?
+  onUpgradeRequired;
+  void Function(String message)? onBanned;
 
   /// تجديد واحد مشترك: عشرة طلبات متزامنة تصطدم بـ401 معاً يجب ألا تُطلق
   /// عشر عمليات تجديد وتُبطل توكن بعضها البعض.
@@ -66,6 +74,8 @@ class ApiClient {
     ErrorInterceptorHandler handler,
   ) async {
     final options = error.requestOptions;
+
+    _signalPlatform(error.response);
 
     // نجدّد لكل طلب حمل توكناً وسقط بـ401 — بما فيه /auth/me. الاستثناء
     // الوحيد هو مسار التجديد ذاته؛ ومسارات الدخول والتسجيل لا تحمل توكناً
@@ -98,6 +108,29 @@ class ApiClient {
       handler.resolve(await dio.fetch(options));
     } on DioException catch (retryError) {
       handler.next(retryError);
+    }
+  }
+
+  /// الرموز وحدها لا تكفي: 403 قد يعني «لست عضواً في القناة» و503 قد يعني
+  /// سيرفراً متعطّلاً. العلامة الصريحة في الرد هي ما يميّز قرار المشرف.
+  void _signalPlatform(Response? response) {
+    final data = response?.data;
+
+    if (response == null || data is! Map) return;
+
+    final message = data['message'] is String ? data['message'] as String : '';
+
+    switch (response.statusCode) {
+      case 503 when data['maintenance'] == true:
+        onMaintenance?.call(message);
+      case 426 when data['upgradeRequired'] == true:
+        onUpgradeRequired?.call(
+          message,
+          data['storeUrl'] is String ? data['storeUrl'] as String : null,
+          data['minVersion'] is String ? data['minVersion'] as String : null,
+        );
+      case 403 when data['banned'] == true:
+        onBanned?.call(message);
     }
   }
 

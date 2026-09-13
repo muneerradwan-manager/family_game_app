@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/common.dart';
+import '../../announcements/cubit/announcements_cubit.dart';
+import '../../announcements/ui/announcements_banner.dart';
 import '../../auth/cubit/auth_cubit.dart';
 import '../cubit/channels_cubit.dart';
 import '../model/channel.dart';
@@ -21,7 +23,13 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     context.read<ChannelsCubit>().load();
+    context.read<AnnouncementsCubit>().load();
   }
+
+  Future<void> _reload() => Future.wait([
+    context.read<ChannelsCubit>().load(),
+    context.read<AnnouncementsCubit>().load(),
+  ]);
 
   Future<void> _joinByCode() async {
     final code = await showModalBottomSheet<String>(
@@ -83,6 +91,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ],
             ),
           ),
+          AnnouncementsBanner(padding: context.listPadding(top: 14, bottom: 0)),
           Expanded(
             child: BlocBuilder<ChannelsCubit, ChannelsState>(
               builder: (context, state) {
@@ -109,7 +118,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 }
 
                 return RefreshIndicator(
-                  onRefresh: () => context.read<ChannelsCubit>().load(),
+                  onRefresh: _reload,
                   child: ListView.separated(
                     padding: context.listPadding(bottom: 32),
                     itemCount: state.channels.length,
