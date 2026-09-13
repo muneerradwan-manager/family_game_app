@@ -3,13 +3,17 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../../core/feedback/game_feedback.dart';
 import '../../../../../core/theme/app_theme.dart';
+import '../../../../../shared/widgets/common.dart';
 import '../../../../../shared/widgets/countdown.dart';
+import '../../../../../shared/widgets/responsive.dart';
 import '../../cubit/harf_game_cubit.dart';
 import '../../model/harf_models.dart';
 
-/// ترويسة ثابتة أثناء اللعب: رقم الجولة، الحرف، وعدّاد المرحلة.
+/// شريط ثابت أثناء اللعب: رقم الجولة، الحرف، المرحلة، وعدّادها.
 ///
-/// العدّاد يُحسب من ختم السيرفر مصحّحاً بفرق الساعة، فيرى الجميع الرقم نفسه.
+/// سطح أبيض بحدّ سفلي كرأس لوحة الإدارة — المرحلة نفسها هي ما يجب أن يلفت
+/// النظر، لا الترويسة. والعدّاد يُحسب من ختم السيرفر مصحّحاً بفرق الساعة،
+/// فيرى الجميع الرقم نفسه.
 class PhaseHeader extends StatelessWidget {
   const PhaseHeader({super.key, required this.state});
 
@@ -23,84 +27,91 @@ class PhaseHeader extends StatelessWidget {
     final showLetter =
         round.phase != HarfPhase.awaitingLetter && round.letter != null;
 
-    return Container(
-      padding: EdgeInsets.only(
-        top: MediaQuery.paddingOf(context).top + 10,
-        left: 20,
-        right: 20,
-        bottom: 16,
-      ),
+    return DecoratedBox(
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: palette.headerGradient,
-          begin: AlignmentDirectional.topStart,
-          end: AlignmentDirectional.bottomEnd,
-        ),
-        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(24)),
+        color: palette.surface,
+        border: Border(bottom: BorderSide(color: palette.outline)),
       ),
-      child: Row(
-        children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: context.contentPadding(
+            top: 10,
+            bottom: 12,
+            minHorizontal: 16,
+            maxWidth: ContentWidth.wide,
+          ),
+          child: Row(
             children: [
-              Text(
-                'جولة ${round.number} من ${snapshot.totalRounds}',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w800,
+              if (showLetter)
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: palette.primary.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(AppRadius.control + 2),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    round.letter!,
+                    style: TextStyle(
+                      color: palette.primary,
+                      fontSize: 26,
+                      fontWeight: FontWeight.w900,
+                      height: 1.1,
+                    ),
+                  ),
+                )
+              else
+                const GradientMark(emoji: '🔠', size: 48),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'جولة ${round.number} من ${snapshot.totalRounds}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: palette.textPrimary,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    InfoChip(
+                      phaseLabel(round.phase),
+                      color: _phaseTone(round.phase, context),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 2),
-              Text(
-                _phaseLabel(round.phase),
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.85),
-                  fontSize: 12.5,
+              if (round.deadline > 0)
+                PhaseCountdown(
+                  key: ValueKey(
+                    '${round.number}-${round.phase}-${round.deadline}',
+                  ),
+                  deadline: round.deadline,
+                  clockSkewMs: state.clockSkewMs,
+                  totalSeconds: _phaseSeconds(round, snapshot.config),
+                  size: 52,
+                  onSecondTick: (remaining) {
+                    // التكّة في آخر 15 ثانية من الكتابة فقط: المراحل القصيرة
+                    // كلها داخل هذا المدى وستصير ضجيجاً متواصلاً.
+                    if (round.phase == HarfPhase.writing && remaining <= 15) {
+                      context.read<GameFeedback>().tick();
+                    }
+                  },
+                  builder: (context, remaining) => _RingCountdown(
+                    remaining: remaining,
+                    total: _phaseSeconds(round, snapshot.config),
+                    urgent: round.phase == HarfPhase.writing && remaining <= 15,
+                  ),
                 ),
-              ),
             ],
           ),
-          const Spacer(),
-          if (showLetter)
-            Container(
-              width: 52,
-              height: 52,
-              margin: const EdgeInsetsDirectional.only(end: 12),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.22),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              alignment: Alignment.center,
-              child: Text(
-                round.letter!,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 28,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ),
-          if (round.deadline > 0)
-            PhaseCountdown(
-              key: ValueKey('${round.number}-${round.phase}-${round.deadline}'),
-              deadline: round.deadline,
-              clockSkewMs: state.clockSkewMs,
-              totalSeconds: _phaseSeconds(round, snapshot.config),
-              size: 54,
-              onSecondTick: (remaining) {
-                // التكّة في آخر 15 ثانية من الكتابة فقط: المراحل القصيرة
-                // كلها داخل هذا المدى وستصير ضجيجاً متواصلاً.
-                if (round.phase == HarfPhase.writing && remaining <= 15) {
-                  context.read<GameFeedback>().tick();
-                }
-              },
-              builder: (context, remaining) => _WhiteCountdown(
-                remaining: remaining,
-                urgent: round.phase == HarfPhase.writing && remaining <= 15,
-              ),
-            ),
-        ],
+        ),
       ),
     );
   }
@@ -118,7 +129,19 @@ class PhaseHeader extends StatelessWidget {
         HarfPhase.tiebreak => 30,
       };
 
-  static String _phaseLabel(HarfPhase phase) => switch (phase) {
+  /// لون شارة المرحلة: لحظات الضغط (المهلة والحسم) بلون التنبيه، والحكم
+  /// (اعتراض وتصويت) بلون التحذير، والباقي بلون الثيم.
+  static Color _phaseTone(HarfPhase phase, BuildContext context) {
+    final palette = context.palette;
+
+    return switch (phase) {
+      HarfPhase.grace || HarfPhase.tiebreak => palette.accent,
+      HarfPhase.objection || HarfPhase.voting => palette.warning,
+      _ => palette.primary,
+    };
+  }
+
+  static String phaseLabel(HarfPhase phase) => switch (phase) {
     HarfPhase.awaitingLetter => 'سحب الحرف',
     HarfPhase.revealLetter => 'استعدوا...',
     HarfPhase.writing => 'اكتبوا!',
@@ -131,35 +154,69 @@ class PhaseHeader extends StatelessWidget {
   };
 }
 
-class _WhiteCountdown extends StatelessWidget {
-  const _WhiteCountdown({required this.remaining, required this.urgent});
+/// حلقة تنقص مع الثواني ورقم في وسطها.
+///
+/// الحلقة تتقدّم بخطوة كل ثانية لا بسلاسة: الـbuilder يعطينا الثواني فقط،
+/// وخطوة بالثانية كافية لعين تتابع الرقم أصلاً.
+class _RingCountdown extends StatelessWidget {
+  const _RingCountdown({
+    required this.remaining,
+    required this.total,
+    required this.urgent,
+  });
 
   final int remaining;
+  final int? total;
   final bool urgent;
 
   @override
-  Widget build(BuildContext context) => AnimatedScale(
-    scale: urgent && remaining.isOdd ? 1.15 : 1,
-    duration: const Duration(milliseconds: 200),
-    child: Container(
-      width: 54,
-      height: 54,
-      decoration: BoxDecoration(
-        color: urgent
-            ? context.palette.accent
-            : Colors.white.withValues(alpha: 0.22),
-        shape: BoxShape.circle,
-      ),
-      alignment: Alignment.center,
-      child: Text(
-        '$remaining',
-        style: const TextStyle(
-          fontFamily: AppTheme.displayFontFamily,
-          color: Colors.white,
-          fontSize: 22,
-          fontWeight: FontWeight.w700,
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final color = urgent ? palette.accent : palette.primary;
+    final progress = total == null || total == 0
+        ? null
+        : (remaining / total!).clamp(0.0, 1.0);
+
+    return AnimatedScale(
+      scale: urgent && remaining.isOdd ? 1.12 : 1,
+      duration: const Duration(milliseconds: 200),
+      child: SizedBox(
+        width: 52,
+        height: 52,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Container(
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: urgent ? 0.16 : 0.08),
+                shape: BoxShape.circle,
+              ),
+            ),
+            if (progress != null)
+              SizedBox.expand(
+                child: TweenAnimationBuilder<double>(
+                  tween: Tween(end: progress),
+                  duration: const Duration(milliseconds: 300),
+                  builder: (context, value, _) => CircularProgressIndicator(
+                    value: value,
+                    strokeWidth: 4,
+                    backgroundColor: palette.outline,
+                    valueColor: AlwaysStoppedAnimation(color),
+                  ),
+                ),
+              ),
+            Text(
+              '$remaining',
+              style: TextStyle(
+                fontFamily: AppTheme.displayFontFamily,
+                color: color,
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
         ),
       ),
-    ),
-  );
+    );
+  }
 }

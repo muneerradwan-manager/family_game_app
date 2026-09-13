@@ -3,50 +3,62 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../../core/theme/app_theme.dart';
 import '../../../../../shared/widgets/common.dart';
+import '../../../../../shared/widgets/responsive.dart';
 import '../../cubit/mashhad_game_cubit.dart';
 import '../../model/mashhad_models.dart';
+import 'mashhad_layout.dart';
 
 /// الكشف الكبير: كل الأدوار والأهداف والادّعاءات دفعةً واحدة.
 ///
 /// هنا تُقرأ القصة من جديد بعيون مختلفة — «آه، لهيك كان مصرّ يطلع!» ومن
 /// يشك في ادّعاء يعترض عليه، ويحسم الباقون.
+///
+/// [compact] للعمود الجانبي أثناء التصويت: البطاقات وحدها بلا عنوان المرحلة
+/// ولا تعليمات الاعتراض — المرحلة انتهت وأزرار الاعتراض تختفي معها.
 class RevealBoard extends StatelessWidget {
-  const RevealBoard({super.key, required this.round});
+  const RevealBoard({super.key, required this.round, this.compact = false});
 
   final MashhadRound round;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     final cubit = context.read<MashhadGameCubit>();
     final palette = context.palette;
 
+    final cards = [
+      for (final row in round.rows)
+        _RevealRow(row: row, isMe: row.userId == cubit.viewerId),
+    ];
+
+    if (compact) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final card in cards) ...[card, const SizedBox(height: 12)],
+        ],
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          '🎭 انكشفت الأدوار',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 23,
-            fontWeight: FontWeight.w900,
-            color: palette.textPrimary,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          cubit.canChallenge
+        PhaseIntro(
+          title: '🎭 انكشفت الأدوار',
+          subtitle: cubit.canChallenge
               ? 'شايف ادّعاء مو مظبوط؟ اعترض عليه — باقي لك ${round.challengesLeft}.'
               : 'ما ضل عندك اعتراضات.',
-          textAlign: TextAlign.center,
-          style: TextStyle(color: palette.textMuted, height: 1.5),
         ),
         const SizedBox(height: 20),
-        for (final row in round.rows)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: _RevealRow(row: row, isMe: row.userId == cubit.viewerId),
-          ),
-        const SizedBox(height: 6),
+        // عمودان على التابلت وما فوق: الكشف يُقرأ مقارنةً بين الأدوار.
+        ResponsiveGrid(
+          minItemWidth: 330,
+          maxColumns: 2,
+          spacing: 12,
+          equalHeight: false,
+          children: cards,
+        ),
+        const SizedBox(height: 16),
         Text(
           'الاعتراض الفاشل بيكلّفك نقاط — اعترض لما تكون متأكد.',
           textAlign: TextAlign.center,
@@ -68,7 +80,8 @@ class _RevealRow extends StatelessWidget {
     final palette = context.palette;
 
     return SectionCard(
-      color: isMe ? palette.primary.withValues(alpha: 0.07) : null,
+      color: isMe ? palette.primary.withValues(alpha: 0.06) : null,
+      padding: const EdgeInsets.all(14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -79,15 +92,16 @@ class _RevealRow extends StatelessWidget {
                   row.username,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontWeight: FontWeight.w900,
+                    fontWeight: FontWeight.w800,
                     fontSize: 15,
                     color: palette.textPrimary,
                   ),
                 ),
               ),
               const SizedBox(width: 8),
-              InfoChip('🎭 ${row.roleName}'),
+              Flexible(child: InfoChip('🎭 ${row.roleName}')),
               const Spacer(),
+              const SizedBox(width: 8),
               Text(
                 '${row.messageCount} رسالة',
                 style: TextStyle(color: palette.textMuted, fontSize: 11.5),
@@ -185,8 +199,9 @@ class _GoalLine extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: palette.surfaceAlt,
-        borderRadius: BorderRadius.circular(14),
+        color: palette.background,
+        borderRadius: BorderRadius.circular(AppRadius.control),
+        border: Border.all(color: palette.outline),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -218,9 +233,7 @@ class _GoalLine extends StatelessWidget {
                 Text(
                   claimed ? 'ادّعى إنه حقّقه ✅' : 'قال إنه ما حقّقه ❌',
                   style: TextStyle(
-                    color: claimed
-                        ? const Color(0xFF2E7D32)
-                        : palette.textMuted,
+                    color: claimed ? palette.success : palette.textMuted,
                     fontSize: 12,
                     fontWeight: FontWeight.w800,
                   ),
@@ -234,12 +247,13 @@ class _GoalLine extends StatelessWidget {
               child: InfoChip('اعترضت', color: palette.accent),
             )
           else if (canChallenge)
-            TextButton(
+            OutlinedButton(
               onPressed: () =>
                   cubit.challenge(targetUserId: row.userId, kind: kind),
-              style: TextButton.styleFrom(
+              style: OutlinedButton.styleFrom(
                 foregroundColor: palette.accent,
-                padding: const EdgeInsets.symmetric(horizontal: 10),
+                side: BorderSide(color: palette.accent.withValues(alpha: 0.5)),
+                padding: const EdgeInsets.symmetric(horizontal: 12),
                 minimumSize: const Size(0, 34),
               ),
               child: const Text('بعترض!'),

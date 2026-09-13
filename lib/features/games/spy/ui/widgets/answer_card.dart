@@ -41,79 +41,76 @@ class _AnswerCardState extends State<AnswerCard> {
     final palette = context.palette;
     final isSpy = context.read<SpyGameCubit>().state.snapshot?.me.isSpy == true;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text(
-          '🙋 سألوك!',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.w900,
-            color: palette.textPrimary,
-          ),
-        ),
-        const SizedBox(height: 16),
-        SectionCard(
-          color: palette.primary.withValues(alpha: 0.08),
-          child: Column(
-            children: [
-              Text(
-                '${widget.turn.askerUsername} بيسأل',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: palette.textMuted,
+    return SectionCard(
+      title: '🙋 سألوك!',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: palette.primary.withValues(alpha: 0.07),
+              borderRadius: BorderRadius.circular(AppRadius.control),
+            ),
+            child: Column(
+              children: [
+                Text(
+                  '${widget.turn.askerUsername} بيسأل',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: palette.textMuted,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                widget.turn.question ?? '',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 19,
-                  height: 1.5,
-                  fontWeight: FontWeight.w800,
-                  color: palette.textPrimary,
+                const SizedBox(height: 8),
+                Text(
+                  widget.turn.question ?? '',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 19,
+                    height: 1.5,
+                    fontWeight: FontWeight.w800,
+                    color: palette.textPrimary,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-        const SizedBox(height: 20),
-        TextField(
-          controller: _controller,
-          enabled: !_sent,
-          autofocus: true,
-          maxLength: 140,
-          maxLines: 2,
-          minLines: 1,
-          textInputAction: TextInputAction.send,
-          onSubmitted: (_) => _send(),
-          decoration: const InputDecoration(
-            hintText: 'جاوب بطريقة ذكية...',
-            counterText: '',
+          const SizedBox(height: 18),
+          TextField(
+            controller: _controller,
+            enabled: !_sent,
+            autofocus: true,
+            maxLength: 140,
+            maxLines: 2,
+            minLines: 1,
+            textInputAction: TextInputAction.send,
+            onSubmitted: (_) => _send(),
+            decoration: const InputDecoration(
+              hintText: 'جاوب بطريقة ذكية...',
+              counterText: '',
+            ),
           ),
-        ),
-        const SizedBox(height: 14),
-        FilledButton.icon(
-          onPressed: _sent ? null : _send,
-          icon: const Icon(Icons.send_rounded, size: 18),
-          label: Text(_sent ? 'انبعت' : 'ابعت الجواب'),
-        ),
-        const SizedBox(height: 12),
-        Text(
-          isSpy
-              ? 'إنت الجاسوس — جاوب شي عام يمشي الحال، وراقب ردّات الفعل.'
-              : 'لا تكشف الكلمة، بس خلّي جوابك يثبت إنك بتعرفها.',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: palette.textMuted,
-            fontSize: 12.5,
-            height: 1.5,
+          const SizedBox(height: 12),
+          FilledButton.icon(
+            onPressed: _sent ? null : _send,
+            icon: const Icon(Icons.send_rounded, size: 18),
+            label: Text(_sent ? 'انبعت' : 'ابعت الجواب'),
           ),
-        ),
-      ],
+          const SizedBox(height: 10),
+          Text(
+            isSpy
+                ? 'إنت الجاسوس — جاوب شي عام يمشي الحال، وراقب ردّات الفعل.'
+                : 'لا تكشف الكلمة، بس خلّي جوابك يثبت إنك بتعرفها.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: palette.textMuted,
+              fontSize: 12.5,
+              height: 1.5,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

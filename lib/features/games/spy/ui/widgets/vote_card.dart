@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../../core/theme/app_theme.dart';
 import '../../../../../shared/widgets/common.dart';
+import '../../../../../shared/widgets/responsive.dart';
 import '../../../../auth/model/app_user.dart';
 import '../../cubit/spy_game_cubit.dart';
 import '../../model/spy_models.dart';
@@ -11,6 +12,9 @@ import '../../model/spy_models.dart';
 ///
 /// صوتك لا يراه أحد قبل إعلان النتيجة — لا في حدث ولا في لقطة غيرك. الرقم
 /// وحده يُبَث ("صوّت 3 من 5") حتى يعرف الجميع أن الانتظار له سبب.
+///
+/// المشتبه بهم شبكة لا عمود: على التابلت يُرى الجميع دفعة واحدة، والمؤقّت
+/// لا ينتظر من يمرّر ليصل إلى آخر اسم.
 class VoteCard extends StatelessWidget {
   const VoteCard({super.key});
 
@@ -22,59 +26,50 @@ class VoteCard extends StatelessWidget {
     final palette = context.palette;
     final myVote = round.myVote;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text(
-          '🗳️ مين الجاسوس؟',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.w900,
-            color: palette.textPrimary,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          cubit.amActive
-              ? 'صوّت على اللي بتشك فيه. أعلى أصوات بيطلع.'
-              : 'إنت خارج التصويت — تفرّج بس.',
-          textAlign: TextAlign.center,
-          style: TextStyle(color: palette.textMuted, height: 1.5),
-        ),
-        const SizedBox(height: 14),
-        Center(
-          child: InfoChip(
-            'صوّت ${round.votedCount} من ${round.eligibleCount}',
-            icon: Icons.how_to_vote_outlined,
-          ),
-        ),
-        const SizedBox(height: 18),
-        for (final player in cubit.suspects)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: _SuspectTile(
-              player: player,
-              selected: player.id == myVote,
-              locked: myVote != null || !cubit.amActive,
-              onTap: () => cubit.vote(player.id),
+    return SectionCard(
+      title: '🗳️ مين الجاسوس؟',
+      subtitle: cubit.amActive
+          ? 'صوّت على اللي بتشك فيه. أعلى أصوات بيطلع.'
+          : 'إنت خارج التصويت — تفرّج بس.',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Center(
+            child: InfoChip(
+              'صوّت ${round.votedCount} من ${round.eligibleCount}',
+              icon: Icons.how_to_vote_outlined,
             ),
           ),
-        if (myVote != null) ...[
-          const SizedBox(height: 6),
+          const SizedBox(height: 16),
+          ResponsiveGrid(
+            minItemWidth: 210,
+            spacing: 10,
+            children: [
+              for (final player in cubit.suspects)
+                _SuspectTile(
+                  player: player,
+                  selected: player.id == myVote,
+                  locked: myVote != null || !cubit.amActive,
+                  onTap: () => cubit.vote(player.id),
+                ),
+            ],
+          ),
+          if (myVote != null) ...[
+            const SizedBox(height: 14),
+            Text(
+              'صوّتت — عم ننطر الباقيين.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: palette.textMuted, fontSize: 13),
+            ),
+          ],
+          const SizedBox(height: 12),
           Text(
-            'صوّتت — عم ننطر الباقيين.',
+            'إذا تعادلوا الأصوات، ما بيطلع حدا وبتبلّش جولة جديدة.',
             textAlign: TextAlign.center,
-            style: TextStyle(color: palette.textMuted, fontSize: 13),
+            style: TextStyle(color: palette.textMuted, fontSize: 12.5),
           ),
         ],
-        const SizedBox(height: 10),
-        Text(
-          'إذا تعادلوا الأصوات، ما بيطلع حدا وبتبلّش جولة جديدة.',
-          textAlign: TextAlign.center,
-          style: TextStyle(color: palette.textMuted, fontSize: 12.5),
-        ),
-      ],
+      ),
     );
   }
 }
@@ -95,43 +90,56 @@ class _SuspectTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
+    final radius = BorderRadius.circular(AppRadius.control);
 
-    return SectionCard(
-      padding: EdgeInsets.zero,
-      color: selected ? palette.accent.withValues(alpha: 0.12) : null,
-      onTap: locked ? null : onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Row(
-          children: [
-            PlayerAvatar(
-              username: player.username,
-              photoUrl: player.photoUrl,
-              avatarId: player.avatarId,
-              gender: Gender.parse(player.gender),
-              size: 40,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                player.username,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontWeight: FontWeight.w800,
-                  fontSize: 15,
-                  color: palette.textPrimary,
+    return Material(
+      color: selected
+          ? palette.accent.withValues(alpha: 0.10)
+          : palette.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: radius,
+        side: BorderSide(
+          color: selected ? palette.accent : palette.outline,
+          width: selected ? 1.6 : 1,
+        ),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: locked ? null : onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          child: Row(
+            children: [
+              PlayerAvatar(
+                username: player.username,
+                photoUrl: player.photoUrl,
+                avatarId: player.avatarId,
+                gender: Gender.parse(player.gender),
+                size: 40,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  player.username,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 15,
+                    color: palette.textPrimary,
+                  ),
                 ),
               ),
-            ),
-            if (selected)
-              Icon(Icons.check_circle, color: palette.accent, size: 24)
-            else if (!locked)
-              Icon(
-                Icons.radio_button_unchecked,
-                color: palette.textMuted,
-                size: 22,
-              ),
-          ],
+              if (selected)
+                Icon(Icons.check_circle, color: palette.accent, size: 24)
+              else if (!locked)
+                Icon(
+                  Icons.radio_button_unchecked,
+                  color: palette.textMuted,
+                  size: 22,
+                ),
+            ],
+          ),
         ),
       ),
     );

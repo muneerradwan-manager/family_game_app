@@ -10,17 +10,23 @@ import '../../../../core/network/api_exception.dart';
 import '../../../../core/theme/app_palette.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/common.dart';
-import '../../../../shared/widgets/responsive.dart';
 import '../../../../shared/widgets/countdown.dart';
+import '../../../../shared/widgets/game_layout.dart';
+import '../../../../shared/widgets/responsive.dart';
+import '../../../../shared/widgets/skeleton.dart';
 import '../../data/game_repository.dart';
 import '../cubit/harf_game_cubit.dart';
 import '../model/harf_models.dart';
+import 'widgets/harf_layout.dart';
 import 'widgets/result_share_card.dart';
 
 /// شاشة النتيجة.
 ///
 /// زر "كمان لعبة؟" هو أعلى رافعة لإعادة اللعب في التطبيق كله: يفتح غرفة
 /// جديدة بنفس الإعدادات بدل إعادة المرور بشاشتي الاختيار والشروط.
+///
+/// على الشاشة العريضة الأزرار في العمود الجانبي بجانب اللوحة، فتبقى في مرمى
+/// العين مهما طالت القائمة؛ على الأضيق في تذييل ثابت.
 class HarfResultView extends StatefulWidget {
   const HarfResultView({super.key});
 
@@ -73,139 +79,115 @@ class _HarfResultViewState extends State<HarfResultView> {
 
     _palette = palette;
 
-    if (result == null) {
-      return const AppLoader(message: 'عم نجهّز النتيجة...');
-    }
+    if (result == null) return const SessionSkeleton();
 
     final winner = result.winner;
     final scores = result.finalScores;
+    final split = SessionBody.isSplit(context);
+
+    final playAgain = FilledButton.icon(
+      onPressed: _opening ? null : _playAgain,
+      icon: _opening
+          ? const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(
+                strokeWidth: 2.2,
+                color: Colors.white,
+              ),
+            )
+          : const Icon(Icons.replay),
+      label: const Text('كمان لعبة؟'),
+    );
+
+    final share = OutlinedButton.icon(
+      onPressed: _sharing ? null : () => _share(result, snapshot),
+      icon: _sharing
+          ? const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : const Icon(Icons.share, size: 18),
+      label: const Text('مشاركة'),
+    );
+
+    final backToChannel = OutlinedButton(
+      onPressed: () => context.go('/channels/${snapshot.channelId}'),
+      child: const Text('رجوع للقناة'),
+    );
 
     return Column(
       children: [
-        Container(
-          width: double.infinity,
-          padding: EdgeInsets.only(
-            top: MediaQuery.paddingOf(context).top + 24,
-            bottom: 28,
-            left: 20,
-            right: 20,
-          ),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: palette.headerGradient,
-              begin: AlignmentDirectional.topStart,
-              end: AlignmentDirectional.bottomEnd,
-            ),
-            borderRadius: const BorderRadius.vertical(
-              bottom: Radius.circular(32),
-            ),
-          ),
-          child: Column(
-            children: [
-              const Text('🏆', style: TextStyle(fontSize: 54)),
-              const SizedBox(height: 10),
-              Text(
-                winner == null ? 'خلصت اللعبة' : 'الفائز: ${winner.username}',
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 24,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              if (winner != null) ...[
-                const SizedBox(height: 4),
-                Text(
-                  '${winner.total} نقطة',
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.9),
-                    fontSize: 15,
-                  ),
-                ),
-              ],
-              if (result.decidedByTiebreak) ...[
-                const SizedBox(height: 8),
-                const InfoChip('حُسمت بجولة الحسم', color: Colors.white),
-              ],
-              if (result.endedEarly) ...[
-                const SizedBox(height: 8),
-                Text(
-                  result.reason == 'not_enough_players'
-                      ? 'وقفت اللعبة — ما ضل كفاية لاعبين'
-                      : 'انتهت مبكراً بعد ${result.roundsPlayed} جولات',
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.9),
-                    fontSize: 13,
-                  ),
-                ),
-              ],
-            ],
-          ),
+        SessionHeader(
+          title: 'لعبة الحروف',
+          subtitle: winner == null
+              ? 'خلصت اللعبة'
+              : 'الفائز: ${winner.username}',
+          emoji: '🔠',
+          showBack: false,
+          stats: [
+            SessionStat('${result.roundsPlayed}', 'جولة'),
+            SessionStat('${scores.length}', 'لاعبين'),
+            if (winner != null) SessionStat('${winner.total}', 'نقطة'),
+          ],
         ),
         Expanded(
-          child: ListView(
-            padding: context.contentPadding(bottom: 12),
-            children: [
-              const SectionTitle('اللوحة النهائية'),
-              for (var index = 0; index < scores.length; index++)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: _FinalRow(rank: index + 1, standing: scores[index]),
-                ),
-            ],
-          ),
-        ),
-        SafeArea(
-          child: Padding(
-            padding: context.contentPadding(top: 4, bottom: 12),
-            child: Column(
+          child: HarfSessionBody(
+            main: HarfPaneList(
+              maxWidth: split ? ContentWidth.wide : ContentWidth.standard,
               children: [
-                FilledButton.icon(
-                  onPressed: _opening ? null : _playAgain,
-                  icon: _opening
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2.2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Icon(Icons.replay),
-                  label: const Text('كمان لعبة؟'),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: _sharing
-                            ? null
-                            : () => _share(result, snapshot),
-                        icon: _sharing
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Icon(Icons.share, size: 18),
-                        label: const Text('مشاركة'),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () =>
-                            context.go('/channels/${snapshot.channelId}'),
-                        child: const Text('رجوع للقناة'),
-                      ),
-                    ),
-                  ],
+                _WinnerCard(result: result),
+                const SizedBox(height: 16),
+                SectionCard(
+                  title: 'اللوحة النهائية',
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Column(
+                    children: [
+                      for (var index = 0; index < scores.length; index++) ...[
+                        if (index > 0) const Divider(height: 1),
+                        _FinalRow(rank: index + 1, standing: scores[index]),
+                      ],
+                    ],
+                  ),
                 ),
               ],
             ),
+            side: SidePanel(
+              children: [
+                SectionCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      playAgain,
+                      const SizedBox(height: 10),
+                      share,
+                      const SizedBox(height: 10),
+                      backToChannel,
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                _ResultDetails(result: result, config: snapshot.config),
+              ],
+            ),
+            // بلا تذييل على الشاشة العريضة: الأزرار نفسها في العمود الجانبي.
+            footer: split
+                ? null
+                : Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      playAgain,
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(child: share),
+                          const SizedBox(width: 10),
+                          Expanded(child: backToChannel),
+                        ],
+                      ),
+                    ],
+                  ),
           ),
         ),
       ],
@@ -263,6 +245,209 @@ class _HarfResultViewState extends State<HarfResultView> {
   };
 }
 
+/// الفائز ومنصّة الثلاثة الأوائل — لحظة الاحتفال الوحيدة في الشاشة، فتحتفظ
+/// بلمسة التدرّج على عمود المركز الأول.
+class _WinnerCard extends StatelessWidget {
+  const _WinnerCard({required this.result});
+
+  final HarfResult result;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final winner = result.winner;
+    final scores = result.finalScores;
+
+    return SectionCard(
+      padding: const EdgeInsets.fromLTRB(20, 22, 20, 20),
+      child: Column(
+        children: [
+          const Text('🏆', style: TextStyle(fontSize: 46)),
+          const SizedBox(height: 8),
+          Text(
+            winner == null ? 'خلصت اللعبة' : 'الفائز: ${winner.username}',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: palette.textPrimary,
+              fontSize: 22,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          if (winner != null) ...[
+            const SizedBox(height: 2),
+            Text(
+              '${winner.total} نقطة',
+              style: TextStyle(color: palette.textMuted, fontSize: 15),
+            ),
+          ],
+          if (result.decidedByTiebreak || result.endedEarly) ...[
+            const SizedBox(height: 10),
+            Wrap(
+              alignment: WrapAlignment.center,
+              spacing: 8,
+              runSpacing: 6,
+              children: [
+                if (result.decidedByTiebreak)
+                  InfoChip(
+                    'حُسمت بجولة الحسم',
+                    color: palette.accent,
+                    icon: Icons.local_fire_department_outlined,
+                  ),
+                if (result.endedEarly)
+                  InfoChip(
+                    result.reason == 'not_enough_players'
+                        ? 'وقفت اللعبة — ما ضل كفاية لاعبين'
+                        : 'انتهت مبكراً بعد ${result.roundsPlayed} جولات',
+                    color: palette.warning,
+                    icon: Icons.info_outline,
+                  ),
+              ],
+            ),
+          ],
+          // المنصّة من لاعبَين فأكثر: لاعب واحد على منصّة يبدو خطأً لا احتفالاً.
+          if (scores.length >= 2) ...[
+            const SizedBox(height: 22),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 520),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Expanded(child: _PodiumStep(rank: 2, standing: scores[1])),
+                  const SizedBox(width: 10),
+                  Expanded(child: _PodiumStep(rank: 1, standing: scores[0])),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: scores.length >= 3
+                        ? _PodiumStep(rank: 3, standing: scores[2])
+                        : const SizedBox.shrink(),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _PodiumStep extends StatelessWidget {
+  const _PodiumStep({required this.rank, required this.standing});
+
+  final int rank;
+  final Standing standing;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final first = rank == 1;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        PlayerAvatar(
+          username: standing.username,
+          photoUrl: standing.photoUrl,
+          avatarId: standing.avatarId,
+          size: first ? 60 : 46,
+          dimmed: standing.hasLeft,
+        ),
+        const SizedBox(height: 6),
+        Text(
+          standing.username,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontWeight: FontWeight.w800,
+            fontSize: first ? 14.5 : 13,
+            color: palette.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Container(
+          height: switch (rank) {
+            1 => 76,
+            2 => 56,
+            _ => 42,
+          },
+          width: double.infinity,
+          decoration: BoxDecoration(
+            gradient: first
+                ? LinearGradient(
+                    colors: palette.headerGradient,
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                  )
+                : null,
+            color: first ? null : palette.surfaceAlt,
+            borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(AppRadius.control),
+            ),
+          ),
+          alignment: Alignment.center,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(switch (rank) {
+                1 => '🥇',
+                2 => '🥈',
+                _ => '🥉',
+              }, style: const TextStyle(fontSize: 18)),
+              Text(
+                '${standing.total}',
+                style: TextStyle(
+                  fontFamily: AppTheme.displayFontFamily,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 15,
+                  color: first ? Colors.white : palette.textPrimary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// تفاصيل اللعبة في العمود الجانبي.
+class _ResultDetails extends StatelessWidget {
+  const _ResultDetails({required this.result, required this.config});
+
+  final HarfResult result;
+  final HarfConfig config;
+
+  @override
+  Widget build(BuildContext context) => SectionCard(
+    title: 'تفاصيل اللعبة',
+    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+    child: Column(
+      children: [
+        HarfDetailRow(
+          icon: Icons.flag_outlined,
+          label: 'الجولات',
+          value: '${result.roundsPlayed}',
+        ),
+        HarfDetailRow(
+          icon: Icons.people_outline,
+          label: 'اللاعبين',
+          value: '${result.finalScores.length}',
+        ),
+        HarfDetailRow(
+          icon: Icons.view_column_outlined,
+          label: 'الخانات',
+          value: '${config.columns.length}',
+        ),
+        HarfDetailRow(
+          icon: Icons.timer_outlined,
+          label: 'وقت الكتابة',
+          value: '${config.writeSeconds} ثانية',
+        ),
+      ],
+    ),
+  );
+}
+
 class _FinalRow extends StatelessWidget {
   const _FinalRow({required this.rank, required this.standing});
 
@@ -274,9 +459,9 @@ class _FinalRow extends StatelessWidget {
     final palette = context.palette;
     final isPodium = rank <= 3;
 
-    return SectionCard(
-      color: isPodium ? palette.primary.withValues(alpha: 0.06) : null,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+    return Container(
+      color: rank == 1 ? palette.primary.withValues(alpha: 0.06) : null,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         children: [
           SizedBox(
@@ -329,7 +514,7 @@ class _FinalRow extends StatelessWidget {
             duration: const Duration(milliseconds: 1200),
             style: TextStyle(
               fontSize: 22,
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w700,
               color: palette.textPrimary,
             ),
           ),

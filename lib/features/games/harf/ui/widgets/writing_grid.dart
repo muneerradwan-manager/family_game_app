@@ -3,10 +3,11 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../../core/theme/app_theme.dart';
 import '../../../../../shared/widgets/common.dart';
-import '../../../../../shared/widgets/responsive.dart';
 import '../../../../../shared/widgets/countdown.dart';
+import '../../../../../shared/widgets/responsive.dart';
 import '../../cubit/harf_game_cubit.dart';
 import '../../model/harf_models.dart';
+import 'harf_layout.dart';
 
 /// مرحلة الكتابة — ومعها مهلة الـ10 ثواني بعد الستوب.
 ///
@@ -76,37 +77,67 @@ class _WritingGridState extends State<WritingGrid> {
         Column(
           children: [
             Expanded(
-              child: ListView(
-                padding: context.contentPadding(top: 18, bottom: 12),
-                children: [
-                  // عمودان على الشاشة العريضة: ستة حقول في عمود واحد تعني
-                  // تمريراً أثناء سباق مع المؤقّت، والتمرير هنا يكلّف جولة.
-                  AdaptiveColumns(
-                    children: [
-                      for (final column in snapshot.config.columns)
-                        _AnswerField(
-                          label: snapshot.config.labelOf(column),
-                          controller: _controllers[column]!,
-                          // في مهلة الـ10 ثواني: إكمال الفارغ فقط، لا تعديل
-                          // على المكتوب.
-                          locked:
-                              isGrace &&
-                              (state.draft[column] ?? '').trim().isNotEmpty,
-                          onChanged: (value) => cubit.setAnswer(column, value),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 70),
-                ],
+              // شريط الستوب تحت القائمة يحجز شريط النظام، فلا تضيفه القائمة.
+              child: MediaQuery.removePadding(
+                context: context,
+                removeBottom: true,
+                child: HarfPaneList(
+                  maxWidth: ContentWidth.wide,
+                  top: 18,
+                  children: [
+                    SectionCard(
+                      padding: const EdgeInsets.fromLTRB(16, 18, 16, 16),
+                      // الأعمدة من العرض المتاح فعلاً: عمود على الجوال، اثنان
+                      // على التابلت، وثلاثة بجانب العمود الجانبي على الشاشة
+                      // الكبيرة — ستة حقول في عمود واحد تعني تمريراً أثناء سباق
+                      // مع المؤقّت، والتمرير هنا يكلّف جولة.
+                      child: ResponsiveGrid(
+                        minItemWidth: 240,
+                        maxColumns: 3,
+                        spacing: 12,
+                        equalHeight: false,
+                        children: [
+                          for (final column in snapshot.config.columns)
+                            _AnswerField(
+                              label: snapshot.config.labelOf(column),
+                              controller: _controllers[column]!,
+                              // في مهلة الـ10 ثواني: إكمال الفارغ فقط، لا تعديل
+                              // على المكتوب.
+                              locked:
+                                  isGrace &&
+                                  (state.draft[column] ?? '').trim().isNotEmpty,
+                              onChanged: (value) =>
+                                  cubit.setAnswer(column, value),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-            SafeArea(
-              top: false,
-              child: Padding(
-                padding: context.contentPadding(top: 0, bottom: 12),
-                child: _StopButton(
-                  enabled: cubit.canPressStop,
-                  onPressed: cubit.pressStop,
+            // SafeArea دائماً: هي التي تحجز ارتفاع شريط تنقّل النظام حين لا
+            // يوجد تذييل تحت اللعب (وتصير صفراً حين يوجد).
+            DecoratedBox(
+              decoration: BoxDecoration(
+                color: palette.surface,
+                border: Border(top: BorderSide(color: palette.outline)),
+              ),
+              child: SafeArea(
+                top: false,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(
+                        maxWidth: ContentWidth.form,
+                      ),
+                      child: _StopButton(
+                        enabled: cubit.canPressStop,
+                        onPressed: cubit.pressStop,
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -116,7 +147,7 @@ class _WritingGridState extends State<WritingGrid> {
         if (isGrace)
           Positioned.fill(
             child: Container(
-              color: palette.background.withValues(alpha: 0.55),
+              color: palette.background.withValues(alpha: 0.6),
               child: Center(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -133,7 +164,9 @@ class _WritingGridState extends State<WritingGrid> {
                       ),
                       decoration: BoxDecoration(
                         color: palette.surface,
-                        borderRadius: BorderRadius.circular(14),
+                        borderRadius: BorderRadius.circular(AppRadius.card),
+                        border: Border.all(color: palette.outline),
+                        boxShadow: AppShadows.card(palette),
                       ),
                       child: Text(
                         round.stopBy == null
@@ -202,11 +235,7 @@ class _AnswerField extends StatelessWidget {
             ? Icon(Icons.lock_outline, size: 18, color: palette.textMuted)
             : (controller.text.trim().isEmpty
                   ? null
-                  : Icon(
-                      Icons.check_circle,
-                      size: 20,
-                      color: palette.secondary,
-                    )),
+                  : Icon(Icons.check_circle, size: 20, color: palette.success)),
       ),
     );
   }
@@ -222,19 +251,21 @@ class _StopButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
+    final radius = BorderRadius.circular(AppRadius.card);
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 250),
-      height: 62,
+      height: 56,
       decoration: BoxDecoration(
-        color: enabled ? palette.accent : palette.outline,
-        borderRadius: BorderRadius.circular(18),
+        color: enabled ? palette.accent : palette.surfaceAlt,
+        borderRadius: radius,
+        border: enabled ? null : Border.all(color: palette.outline),
         boxShadow: enabled
             ? [
                 BoxShadow(
-                  color: palette.accent.withValues(alpha: 0.4),
-                  blurRadius: 18,
-                  spreadRadius: 1,
+                  color: palette.accent.withValues(alpha: 0.35),
+                  blurRadius: 16,
+                  offset: const Offset(0, 4),
                 ),
               ]
             : null,
@@ -242,14 +273,14 @@ class _StopButton extends StatelessWidget {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: radius,
           onTap: enabled ? onPressed : null,
           child: Center(
             child: Text(
               enabled ? 'ستوب!' : 'كمّل كل الخانات',
               style: TextStyle(
-                color: enabled ? Colors.white : context.palette.textMuted,
-                fontSize: 20,
+                color: enabled ? Colors.white : palette.textMuted,
+                fontSize: enabled ? 20 : 17,
                 fontWeight: FontWeight.w900,
               ),
             ),
@@ -266,21 +297,20 @@ class _SpectatorNotice extends StatelessWidget {
   final String letter;
 
   @override
-  Widget build(BuildContext context) => Center(
-    child: Padding(
-      padding: const EdgeInsets.all(28),
+  Widget build(BuildContext context) => HarfPaneCenter(
+    child: SectionCard(
+      padding: const EdgeInsets.only(top: 24),
       child: Column(
-        mainAxisSize: MainAxisSize.min,
         children: [
           Text(
             letter,
             style: TextStyle(
-              fontSize: 90,
+              fontSize: 80,
               fontWeight: FontWeight.w900,
+              height: 1.2,
               color: context.palette.primary,
             ),
           ),
-          const SizedBox(height: 12),
           const EmptyState(
             emoji: '👀',
             title: 'اللعبة بلّشت',

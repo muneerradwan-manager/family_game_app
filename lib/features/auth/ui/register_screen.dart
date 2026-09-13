@@ -12,11 +12,11 @@ import '../../../core/theme/app_palette.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/avatars.dart';
 import '../../../shared/widgets/common.dart';
-import '../../../shared/widgets/responsive.dart';
 import '../../../shared/widgets/photo_picker.dart';
 import '../cubit/auth_cubit.dart';
 import '../data/auth_repository.dart';
 import '../model/app_user.dart';
+import 'auth_layout.dart';
 
 /// التسجيل على خطوتين: الحساب أولاً ثم البروفايل.
 ///
@@ -146,17 +146,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
   }
 
+  void _back() =>
+      _step == 1 ? setState(() => _step = 0) : Navigator.of(context).pop();
+
   @override
   Widget build(BuildContext context) {
+    final palette = context.palette;
+
     return Scaffold(
-      appBar: AppBar(
-        title: Text(_step == 0 ? 'حساب جديد' : 'عرّفنا عليك'),
-        leading: BackButton(
-          onPressed: () => _step == 1
-              ? setState(() => _step = 0)
-              : Navigator.of(context).pop(),
-        ),
-      ),
       body: BlocConsumer<AuthCubit, AuthState>(
         listenWhen: (previous, current) => previous.error != current.error,
         listener: (context, state) {
@@ -164,21 +161,41 @@ class _RegisterScreenState extends State<RegisterScreen> {
             showAppSnack(context, state.error!, isError: true);
           }
         },
-        builder: (context, state) => SafeArea(
+        builder: (context, state) => AuthLayout(
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _StepBar(step: _step),
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: context.listPadding(
-                    top: 8,
-                    bottom: 28,
-                    minHorizontal: 24,
-                    maxWidth: ContentWidth.form,
+              Row(
+                children: [
+                  AppBackButton(onPressed: _back),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _step == 0 ? 'حساب جديد' : 'عرّفنا عليك',
+                          style: TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w800,
+                            color: palette.textPrimary,
+                          ),
+                        ),
+                        Text(
+                          'الخطوة ${_step + 1} من 2',
+                          style: TextStyle(
+                            color: palette.textMuted,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  child: _step == 0 ? _accountStep(state) : _profileStep(state),
-                ),
+                ],
               ),
+              const SizedBox(height: 18),
+              _StepBar(step: _step),
+              const SizedBox(height: 16),
+              _step == 0 ? _accountStep(state) : _profileStep(state),
             ],
           ),
         ),
@@ -507,12 +524,7 @@ class _StepBar extends StatelessWidget {
     final palette = context.palette;
 
     return Padding(
-      padding: EdgeInsets.fromLTRB(
-        context.sideGutter(maxWidth: ContentWidth.form, minimum: 24),
-        4,
-        context.sideGutter(maxWidth: ContentWidth.form, minimum: 24),
-        16,
-      ),
+      padding: EdgeInsets.zero,
       child: Row(
         children: [
           for (var index = 0; index < 2; index++) ...[

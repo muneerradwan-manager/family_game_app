@@ -50,6 +50,22 @@ class AppPalette {
 
   Brightness get brightness => isDark ? Brightness.dark : Brightness.light;
 
+  /// الشريط الجانبي على الشاشات الكبيرة: داكن بلمسة من لون الثيم — كلوحة
+  /// الإدارة — فيبقى الثيم حاضراً بلا أن ينافس المحتوى على الانتباه.
+  Color get sidebar => isDark
+      ? Color.lerp(background, Colors.black, 0.35)!
+      : Color.lerp(primary, const Color(0xFF0B1220), 0.86)!;
+
+  Color get sidebarText => const Color(0xFFCBD5E1);
+
+  /// ألوان الحالة ثابتة عبر الثيمات: «شغّالة» خضراء في كل ثيم، وإلا صار
+  /// معنى اللون يتبدّل مع ذوق المستخدم.
+  Color get success => const Color(0xFF16A34A);
+
+  Color get warning => const Color(0xFFD97706);
+
+  Color get danger => const Color(0xFFDC2626);
+
   /// ثيم من لوحة الإدارة (`AppTheme::toApi`).
   ///
   /// null لأي ثيم ناقص أو بلون تالف: ثيم بلون واحد خاطئ يرسم نصاً غير

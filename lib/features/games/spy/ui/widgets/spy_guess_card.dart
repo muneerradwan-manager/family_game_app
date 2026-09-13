@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../../core/theme/app_theme.dart';
 import '../../../../../shared/widgets/common.dart';
+import '../../../../../shared/widgets/responsive.dart';
 import '../../cubit/spy_game_cubit.dart';
 
 /// فرصة الجاسوس الأخيرة.
@@ -40,68 +41,76 @@ class _SpyGuessCardState extends State<SpyGuessCard> {
   Widget build(BuildContext context) {
     final palette = context.palette;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        const Text(
-          '🕵️',
-          style: TextStyle(fontSize: 52),
-          textAlign: TextAlign.center,
-        ),
-        const SizedBox(height: 12),
-        Text(
-          widget.isMe ? 'انكشفت! آخر فرصة' : 'فرصة الجاسوس الأخيرة',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 23,
-            fontWeight: FontWeight.w900,
-            color: palette.accent,
+    return SectionCard(
+      padding: const EdgeInsets.all(22),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            '🕵️',
+            style: TextStyle(fontSize: 48),
+            textAlign: TextAlign.center,
           ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          widget.isMe
-              ? 'خمّن الكلمة الصحيحة وبتفوز رغم إنهم مسكوك.'
-              : '${widget.spyUsername ?? 'الجاسوس'} عم يخمّن الكلمة — إذا صحّت بيفوز عليكم!',
-          textAlign: TextAlign.center,
-          style: TextStyle(color: palette.textMuted, height: 1.6),
-        ),
-        const SizedBox(height: 24),
-        Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          alignment: WrapAlignment.center,
-          children: [
-            for (final word in widget.options)
-              _WordOption(
-                word: word,
-                selected: word == _picked,
-                dimmed: _picked != null && word != _picked,
-                onTap: widget.isMe && _picked == null
-                    ? () => _pick(word)
-                    : null,
-              ),
-          ],
-        ),
-        if (!widget.isMe) ...[
-          const SizedBox(height: 22),
-          SectionCard(
-            color: palette.surfaceAlt,
-            child: Text(
-              'ما بتقدر تتدخل — تفرّج وشوف إذا رح يصيبها 🤞',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: palette.textMuted, height: 1.5),
+          const SizedBox(height: 10),
+          Text(
+            widget.isMe ? 'انكشفت! آخر فرصة' : 'فرصة الجاسوس الأخيرة',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w900,
+              color: palette.accent,
             ),
           ),
-        ] else if (_picked != null) ...[
-          const SizedBox(height: 22),
+          const SizedBox(height: 8),
           Text(
-            'اخترت "$_picked" — عم ننطر الحكم...',
+            widget.isMe
+                ? 'خمّن الكلمة الصحيحة وبتفوز رغم إنهم مسكوك.'
+                : '${widget.spyUsername ?? 'الجاسوس'} عم يخمّن الكلمة — إذا صحّت بيفوز عليكم!',
             textAlign: TextAlign.center,
-            style: TextStyle(color: palette.textMuted),
+            style: TextStyle(color: palette.textMuted, height: 1.6),
           ),
+          const SizedBox(height: 22),
+          // شبكة بأعمدة متساوية: الكلمات بطول مختلف، وصفوف متعرّجة تجعل
+          // كلمة تبدو أبرز من غيرها — وهذا تلميح لا نريده.
+          ResponsiveGrid(
+            minItemWidth: 140,
+            spacing: 10,
+            children: [
+              for (final word in widget.options)
+                _WordOption(
+                  word: word,
+                  selected: word == _picked,
+                  dimmed: _picked != null && word != _picked,
+                  onTap: widget.isMe && _picked == null
+                      ? () => _pick(word)
+                      : null,
+                ),
+            ],
+          ),
+          if (!widget.isMe) ...[
+            const SizedBox(height: 20),
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: palette.surfaceAlt,
+                borderRadius: BorderRadius.circular(AppRadius.control),
+              ),
+              child: Text(
+                'ما بتقدر تتدخل — تفرّج وشوف إذا رح يصيبها 🤞',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: palette.textMuted, height: 1.5),
+              ),
+            ),
+          ] else if (_picked != null) ...[
+            const SizedBox(height: 20),
+            Text(
+              'اخترت "$_picked" — عم ننطر الحكم...',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: palette.textMuted),
+            ),
+          ],
         ],
-      ],
+      ),
     );
   }
 }
@@ -127,30 +136,29 @@ class _WordOption extends StatelessWidget {
       opacity: dimmed ? 0.4 : 1,
       child: Material(
         color: selected
-            ? palette.accent.withValues(alpha: 0.18)
+            ? palette.accent.withValues(alpha: 0.12)
             : palette.surface,
-        borderRadius: BorderRadius.circular(16),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.control),
+          side: BorderSide(
+            color: selected ? palette.accent : palette.outline,
+            width: selected ? 2 : 1,
+          ),
+        ),
+        clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(16),
-          child: Container(
-            constraints: const BoxConstraints(minWidth: 118),
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: selected ? palette.accent : palette.outline,
-                width: selected ? 2 : 1,
-              ),
-            ),
-            alignment: Alignment.center,
-            child: Text(
-              word,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.w800,
-                color: selected ? palette.accent : palette.textPrimary,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+            child: Center(
+              child: Text(
+                word,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
+                  color: selected ? palette.accent : palette.textPrimary,
+                ),
               ),
             ),
           ),

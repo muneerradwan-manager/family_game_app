@@ -8,6 +8,7 @@ import '../../../../core/feedback/game_feedback.dart';
 import '../../../../core/realtime/realtime_client.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/common.dart';
+import '../../../../shared/widgets/skeleton.dart';
 import '../../../auth/cubit/auth_cubit.dart';
 import '../../data/game_repository.dart';
 import '../cubit/spy_game_cubit.dart';
@@ -185,7 +186,9 @@ class _SessionViewState extends State<_SessionView> {
           },
           builder: (context, state) {
             if (state.loading && state.snapshot == null) {
-              return const AppLoader(message: 'عم ندخّلك على اللعبة...');
+              // هيكل بشكل الجلسة لا دائرة تدور: الرأس والعمود الجانبي في
+              // مكانهما قبل أن تصل اللقطة، فلا تقفز الشاشة حين تصل.
+              return const SessionSkeleton();
             }
 
             final snapshot = state.snapshot;
@@ -235,7 +238,7 @@ class _OfflineBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
     width: double.infinity,
-    color: context.palette.accent,
+    color: context.palette.warning,
     padding: EdgeInsets.only(
       top: MediaQuery.paddingOf(context).top + 6,
       bottom: 6,

@@ -1,19 +1,32 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../../core/theme/app_palette.dart';
 import '../../../../../core/theme/app_theme.dart';
 import '../../../../../shared/widgets/common.dart';
+import '../../../../../shared/widgets/responsive.dart';
 import '../../cubit/hadaf_game_cubit.dart';
 import '../../model/hadaf_models.dart';
+import 'hadaf_skeletons.dart';
+
+/// لون شارة الصعوبة — ألوان الحالة الثابتة، فالصعب أحمر في كل ثيم.
+Color hadafDifficultyColor(AppPalette palette, String difficulty) =>
+    switch (difficulty) {
+      'easy' => palette.success,
+      'hard' => palette.danger,
+      _ => palette.warning,
+    };
 
 /// السؤال وخياراته الأربعة — قلب السباق.
 ///
-/// الخيارات أزرار كبيرة متساوية: في لعبة تُحسم بالمللي ثانية، زرٌّ صغير أو
+/// الخيارات بطاقات كبيرة متساوية: في لعبة تُحسم بالمللي ثانية، زرٌّ صغير أو
 /// غير متساوٍ مع أخيه يُعطي ميزةً لا علاقة لها بالذكاء.
 class QuestionCard extends StatelessWidget {
   const QuestionCard({super.key, required this.round});
 
   final HadafRound round;
+
+  static const _letters = ['أ', 'ب', 'ج', 'د'];
 
   @override
   Widget build(BuildContext context) {
@@ -22,83 +35,99 @@ class QuestionCard extends StatelessWidget {
     final palette = context.palette;
     final question = round.question;
 
-    if (question == null || question.isTeaser) {
-      return const AppLoader(message: 'عم يجهّز السؤال...');
-    }
+    if (question == null || question.isTeaser) return const QuestionSkeleton();
 
     final revealed = round.phase.isRevealed;
     final locked = round.hasAnswered || !cubit.amRacing;
+    // من التابلت وأعلى: شبكة 2×2 فتبقى الخيارات كلها تحت السؤال بلا تمرير؛
+    // على الجوال عمود واحد فيتّسع السطر لخيار طويل بخط كبير.
+    final grid = context.screenWidth >= Breakpoints.tablet;
+
+    Widget choice(int index) => _ChoiceOption(
+      label: question.choices[index],
+      letter: index < _letters.length ? _letters[index] : '${index + 1}',
+      index: index,
+      myChoice: round.myChoice,
+      answerIndex: revealed ? round.answerIndex : null,
+      armed: state.riskArmed,
+      onTap: locked ? null : () => cubit.answer(index),
+    );
+
+    final count = question.choices.length;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            InfoChip(
-              '${question.categoryEmoji ?? ''} ${question.categoryLabel ?? ''}',
-            ),
-            const SizedBox(width: 8),
-            InfoChip(
-              question.difficultyLabel,
-              color: switch (question.difficulty) {
-                'easy' => const Color(0xFF2E7D32),
-                'hard' => palette.accent,
-                _ => palette.secondary,
-              },
-            ),
-          ],
+        SectionCard(
+          padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
+          child: Column(
+            children: [
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                alignment: WrapAlignment.center,
+                children: [
+                  InfoChip(
+                    '${question.categoryEmoji ?? ''} ${question.categoryLabel ?? ''}',
+                  ),
+                  InfoChip(
+                    question.difficultyLabel,
+                    color: hadafDifficultyColor(palette, question.difficulty),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              Text(
+                question.prompt!,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: grid ? 25 : 22,
+                  height: 1.5,
+                  fontWeight: FontWeight.w900,
+                  color: palette.textPrimary,
+                ),
+              ),
+            ],
+          ),
         ),
         const SizedBox(height: 18),
-        SectionCard(
-          padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 20),
-          child: Text(
-            question.prompt!,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 24,
-              height: 1.5,
-              fontWeight: FontWeight.w900,
-              color: palette.textPrimary,
-            ),
-          ),
-        ),
-        const SizedBox(height: 20),
-        // شبكة 2×2: كل الخيارات في مرمى الإبهام بلا تمرير.
-        for (var row = 0; row < (question.choices.length / 2).ceil(); row++)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: Row(
-              children: [
-                for (var column = 0; column < 2; column++)
-                  if (row * 2 + column < question.choices.length) ...[
-                    if (column == 1) const SizedBox(width: 12),
+        if (grid)
+          for (var index = 0; index < count; index += 2)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              // ارتفاع واحد للخيارين في الصف: خيار أطول من أخيه يبدو هدفاً أكبر.
+              child: IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(child: choice(index)),
+                    const SizedBox(width: 12),
                     Expanded(
-                      child: _ChoiceButton(
-                        label: question.choices[row * 2 + column],
-                        index: row * 2 + column,
-                        myChoice: round.myChoice,
-                        answerIndex: revealed ? round.answerIndex : null,
-                        armed: state.riskArmed,
-                        onTap: locked
-                            ? null
-                            : () => cubit.answer(row * 2 + column),
-                      ),
+                      child: index + 1 < count
+                          ? choice(index + 1)
+                          : const SizedBox.shrink(),
                     ),
                   ],
-              ],
+                ),
+              ),
+            )
+        else
+          for (var index = 0; index < count; index++)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: choice(index),
             ),
-          ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 8),
         if (!revealed) _RaceStatus(round: round, locked: locked),
       ],
     );
   }
 }
 
-class _ChoiceButton extends StatelessWidget {
-  const _ChoiceButton({
+class _ChoiceOption extends StatelessWidget {
+  const _ChoiceOption({
     required this.label,
+    required this.letter,
     required this.index,
     required this.myChoice,
     required this.answerIndex,
@@ -107,6 +136,7 @@ class _ChoiceButton extends StatelessWidget {
   });
 
   final String label;
+  final String letter;
   final int index;
   final int? myChoice;
 
@@ -123,22 +153,32 @@ class _ChoiceButton extends StatelessWidget {
     final revealed = answerIndex != null;
     final isAnswer = revealed && answerIndex == index;
     final wrongPick = revealed && mine && !isAnswer;
+    final strong = isAnswer || wrongPick || mine;
+    final radius = BorderRadius.circular(AppRadius.card);
 
-    final (Color border, Color fill) = switch (true) {
+    final (Color tone, Color fill) = switch (true) {
       _ when isAnswer => (
-        const Color(0xFF2E7D32),
-        const Color(0xFF2E7D32).withValues(alpha: 0.16),
+        palette.success,
+        palette.success.withValues(alpha: 0.10),
       ),
       _ when wrongPick => (
-        palette.accent,
-        palette.accent.withValues(alpha: 0.14),
+        palette.danger,
+        palette.danger.withValues(alpha: 0.08),
       ),
-      _ when mine => (palette.primary, palette.primary.withValues(alpha: 0.14)),
+      _ when mine => (palette.primary, palette.primary.withValues(alpha: 0.08)),
+      // ⚡ مفعّلة: كل الخيارات تلبس لون المخاطرة، فتُرى قبل الضغط لا بعده.
       _ when armed && onTap != null => (
         palette.accent,
-        palette.accent.withValues(alpha: 0.06),
+        palette.accent.withValues(alpha: 0.05),
       ),
       _ => (palette.outline, palette.surface),
+    };
+
+    final trailing = switch (true) {
+      _ when isAnswer => Icon(Icons.check_circle_rounded, color: tone),
+      _ when wrongPick => Icon(Icons.cancel_rounded, color: tone),
+      _ when mine => Icon(Icons.radio_button_checked_rounded, color: tone),
+      _ => null,
     };
 
     return Opacity(
@@ -146,43 +186,51 @@ class _ChoiceButton extends StatelessWidget {
       opacity: revealed && !isAnswer && !mine ? 0.45 : 1,
       child: Material(
         color: fill,
-        borderRadius: BorderRadius.circular(18),
+        clipBehavior: Clip.antiAlias,
+        shape: RoundedRectangleBorder(
+          borderRadius: radius,
+          side: BorderSide(color: tone, width: strong ? 2 : 1.2),
+        ),
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(18),
-          child: Container(
-            constraints: const BoxConstraints(minHeight: 74),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(
-                color: border,
-                width: isAnswer || wrongPick || mine ? 2.2 : 1.2,
-              ),
-            ),
-            alignment: Alignment.center,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Flexible(
-                  child: Text(
-                    label,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 19,
-                      fontWeight: FontWeight.w800,
-                      color: palette.textPrimary,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 66),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              child: Row(
+                children: [
+                  Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: strong ? tone : palette.surfaceAlt,
+                      shape: BoxShape.circle,
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      letter,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 14,
+                        color: strong ? Colors.white : palette.textMuted,
+                      ),
                     ),
                   ),
-                ),
-                if (isAnswer) ...[
-                  const SizedBox(width: 8),
-                  const Text('✅', style: TextStyle(fontSize: 17)),
-                ] else if (wrongPick) ...[
-                  const SizedBox(width: 8),
-                  const Text('❌', style: TextStyle(fontSize: 17)),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: 18,
+                        height: 1.35,
+                        fontWeight: FontWeight.w800,
+                        color: palette.textPrimary,
+                      ),
+                    ),
+                  ),
+                  if (trailing != null) ...[const SizedBox(width: 8), trailing],
                 ],
-              ],
+              ),
             ),
           ),
         ),
@@ -201,12 +249,23 @@ class _RaceStatus extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
+    final progress = round.activeCount == 0
+        ? 0.0
+        : (round.answeredCount / round.activeCount).clamp(0.0, 1.0);
 
     return Column(
       children: [
         InfoChip(
           'جاوب ${round.answeredCount} من ${round.activeCount}',
           icon: Icons.people_outline,
+        ),
+        const SizedBox(height: 10),
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 220),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: LinearProgressIndicator(value: progress, minHeight: 5),
+          ),
         ),
         if (locked && round.hasAnswered) ...[
           const SizedBox(height: 10),

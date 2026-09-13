@@ -118,7 +118,7 @@ class SpyShareCard extends StatelessWidget {
                 color: player.wasSpy
                     ? palette.accent.withValues(alpha: 0.12)
                     : palette.surface,
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(18),
                 border: Border.all(
                   color: player.wasSpy ? palette.accent : palette.outline,
                   width: player.wasSpy ? 2 : 1,
@@ -181,8 +181,9 @@ class _Fact extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.symmetric(vertical: 26, horizontal: 20),
     decoration: BoxDecoration(
-      color: palette.surfaceAlt,
+      color: palette.surface,
       borderRadius: BorderRadius.circular(24),
+      border: Border.all(color: palette.outline, width: 2),
     ),
     child: Column(
       children: [

@@ -14,6 +14,9 @@ class GameKind {
     'mashhad': (name: 'لعبة المشهد', icon: '🎬'),
   };
 
+  /// الألعاب المعروفة — لعرضها في واجهة الدخول قبل أي اتصال بالسيرفر.
+  static Iterable<({String name, String icon})> get all => _known.values;
+
   static String nameOf(String gameType) => _known[gameType]?.name ?? 'لعبة';
 
   static String iconOf(String gameType) => _known[gameType]?.icon ?? '🎲';

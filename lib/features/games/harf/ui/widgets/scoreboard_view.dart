@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 
 import '../../../../../core/theme/app_theme.dart';
 import '../../../../../shared/widgets/common.dart';
-import '../../../../../shared/widgets/responsive.dart';
 import '../../../../../shared/widgets/countdown.dart';
 import '../../model/harf_models.dart';
+import 'harf_layout.dart';
 
 /// لوحة النقاط بعد كل جولة: الأرقام ترتفع بحركة، ثم الجولة التالية تلقائياً.
+///
+/// جدول واحد بأسطر مفصولة لا بطاقة لكل لاعب — الترتيب يُقرأ من أعلى لأسفل
+/// بلمحة، كجداول لوحة الإدارة.
 class ScoreboardView extends StatelessWidget {
   const ScoreboardView({
     super.key,
@@ -22,21 +25,27 @@ class ScoreboardView extends StatelessWidget {
     final palette = context.palette;
     final standings = snapshot.standings;
 
-    return ListView(
-      padding: context.contentPadding(top: 18, bottom: 24),
+    return HarfPaneList(
+      top: 18,
       children: [
-        for (var index = 0; index < standings.length; index++)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: _StandingRow(
-              rank: index + 1,
-              standing: standings[index],
-              gained: round.roundScores[standings[index].userId],
-              columns: snapshot.config.columns,
-              labels: snapshot.config,
-            ),
+        SectionCard(
+          title: 'النقاط',
+          subtitle: 'جولة ${round.number} من ${snapshot.totalRounds}',
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Column(
+            children: [
+              for (var index = 0; index < standings.length; index++) ...[
+                if (index > 0) const Divider(height: 1),
+                _StandingRow(
+                  rank: index + 1,
+                  standing: standings[index],
+                  gained: round.roundScores[standings[index].userId],
+                ),
+              ],
+            ],
           ),
-        const SizedBox(height: 10),
+        ),
+        const SizedBox(height: 16),
         Center(
           child: Text(
             round.number >= snapshot.totalRounds
@@ -55,24 +64,23 @@ class _StandingRow extends StatelessWidget {
     required this.rank,
     required this.standing,
     required this.gained,
-    required this.columns,
-    required this.labels,
   });
 
   final int rank;
   final Standing standing;
   final RoundScore? gained;
-  final List<String> columns;
-  final HarfConfig labels;
 
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
     final delta = gained?.total ?? 0;
+    final hasNotes =
+        gained != null && (gained!.stopBonus != 0 || gained!.penalties != 0);
 
-    return SectionCard(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
@@ -108,12 +116,9 @@ class _StandingRow extends StatelessWidget {
               if (delta != 0)
                 Padding(
                   padding: const EdgeInsetsDirectional.only(end: 10),
-                  child: Text(
+                  child: InfoChip(
                     delta > 0 ? '+$delta' : '$delta',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w800,
-                      color: delta > 0 ? palette.secondary : palette.accent,
-                    ),
+                    color: delta > 0 ? palette.success : palette.danger,
                   ),
                 ),
               // الرقم يرتفع بحركة: النقاط تُحسّ لا تُقرأ فقط.
@@ -121,30 +126,31 @@ class _StandingRow extends StatelessWidget {
                 standing.total,
                 style: TextStyle(
                   fontSize: 21,
-                  fontWeight: FontWeight.w900,
+                  fontWeight: FontWeight.w700,
                   color: palette.textPrimary,
                 ),
               ),
             ],
           ),
-          if (gained != null &&
-              (gained!.stopBonus != 0 || gained!.penalties != 0)) ...[
+          if (hasNotes) ...[
             const SizedBox(height: 8),
-            Row(
-              children: [
-                const SizedBox(width: 26),
-                if (gained!.stopBonus > 0)
-                  const InfoChip('بونص ستوب +10', color: Color(0xFF2E7D32)),
-                if (gained!.stopBonus < 0)
-                  InfoChip('عقوبة ستوب −10', color: palette.accent),
-                if (gained!.penalties != 0) ...[
-                  const SizedBox(width: 8),
-                  InfoChip(
-                    'اعتراض فاشل ${gained!.penalties}',
-                    color: palette.accent,
-                  ),
+            Padding(
+              padding: const EdgeInsetsDirectional.only(start: 76),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                children: [
+                  if (gained!.stopBonus > 0)
+                    InfoChip('بونص ستوب +10', color: palette.success),
+                  if (gained!.stopBonus < 0)
+                    InfoChip('عقوبة ستوب −10', color: palette.accent),
+                  if (gained!.penalties != 0)
+                    InfoChip(
+                      'اعتراض فاشل ${gained!.penalties}',
+                      color: palette.accent,
+                    ),
                 ],
-              ],
+              ),
             ),
           ],
         ],

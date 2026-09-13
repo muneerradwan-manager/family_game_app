@@ -1,4 +1,3 @@
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -9,9 +8,14 @@ import '../../../core/theme/theme_cubit.dart';
 import '../../../shared/avatars.dart';
 import '../../../shared/widgets/common.dart';
 import '../../../shared/widgets/photo_picker.dart';
+import '../../../shared/widgets/responsive.dart';
 import '../../auth/cubit/auth_cubit.dart';
 import '../../auth/model/app_user.dart';
 
+/// الإعدادات: الحساب والصوت في عمود جانبي، والثيمات شبكة في العمود الرئيسي.
+///
+/// الثيمات شبكة لا شريط أفقي: كلها ظاهرة معاً للمقارنة، ولا تمرير أفقي
+/// يتعطّل بالماوس على سطح المكتب.
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
 
@@ -28,43 +32,70 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final palette = context.palette;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('الإعدادات')),
       body: ListView(
-        padding: context.listPadding(top: 12, bottom: 32),
+        padding: context.pagePadding(),
         children: [
-          if (user != null) _ProfileCard(user: user),
-          const SizedBox(height: 22),
-          const SectionTitle('شكل التطبيق'),
-          const _ThemePicker(),
-          const SizedBox(height: 22),
-          const SectionTitle('الصوت'),
-          SectionCard(
-            child: SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              value: _soundEnabled,
-              title: Text(
-                'أصوات اللعبة',
-                style: TextStyle(
-                  fontWeight: FontWeight.w700,
-                  color: palette.textPrimary,
-                ),
-              ),
-              subtitle: Text(
-                'تكّة العدّاد وصوت الستوب',
-                style: TextStyle(color: palette.textMuted, fontSize: 12.5),
-              ),
-              onChanged: (value) async {
-                await context.read<GameFeedback>().setSoundEnabled(value);
-
-                if (mounted) setState(() => _soundEnabled = value);
-              },
-            ),
+          const PageHeader(
+            leading: AppBackButton(),
+            title: 'الإعدادات',
+            subtitle: 'حسابك وشكل التطبيق',
           ),
-          const SizedBox(height: 22),
-          OutlinedButton.icon(
-            onPressed: () => context.read<AuthCubit>().logout(),
-            icon: const Icon(Icons.logout, size: 18),
-            label: const Text('تسجيل الخروج'),
+          const SizedBox(height: 24),
+          TwoPane(
+            sideWidth: 380,
+            sideFirstWhenStacked: true,
+            main: const _ThemesCard(),
+            side: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (user != null) ...[
+                  _ProfileCard(user: user),
+                  const SizedBox(height: 20),
+                ],
+                SectionCard(
+                  title: 'الصوت',
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 18,
+                    vertical: 6,
+                  ),
+                  child: SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    value: _soundEnabled,
+                    title: Text(
+                      'أصوات اللعبة',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: palette.textPrimary,
+                      ),
+                    ),
+                    subtitle: Text(
+                      'تكّة العدّاد وصوت الستوب',
+                      style: TextStyle(
+                        color: palette.textMuted,
+                        fontSize: 12.5,
+                      ),
+                    ),
+                    onChanged: (value) async {
+                      await context.read<GameFeedback>().setSoundEnabled(value);
+
+                      if (mounted) setState(() => _soundEnabled = value);
+                    },
+                  ),
+                ),
+                const SizedBox(height: 20),
+                OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: palette.danger,
+                    side: BorderSide(
+                      color: palette.danger.withValues(alpha: 0.35),
+                    ),
+                  ),
+                  onPressed: () => context.read<AuthCubit>().logout(),
+                  icon: const Icon(Icons.logout_rounded, size: 18),
+                  label: const Text('تسجيل الخروج'),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -82,68 +113,81 @@ class _ProfileCard extends StatelessWidget {
     final palette = context.palette;
 
     return SectionCard(
-      child: Row(
+      title: 'حسابي',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          GestureDetector(
-            onTap: () => _changePhoto(context, user),
-            child: Stack(
-              alignment: AlignmentDirectional.bottomEnd,
-              children: [
-                PlayerAvatar(
-                  username: user.username,
-                  photoUrl: user.photoUrl,
-                  avatarId: user.avatarId,
-                  gender: user.gender,
-                  size: 58,
-                ),
-                Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(
-                    color: palette.primary,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: palette.surface, width: 2),
+          Row(
+            children: [
+              Tooltip(
+                message: 'غيّر الصورة',
+                child: GestureDetector(
+                  onTap: () => _changePhoto(context, user),
+                  child: Stack(
+                    alignment: AlignmentDirectional.bottomEnd,
+                    children: [
+                      PlayerAvatar(
+                        username: user.username,
+                        photoUrl: user.photoUrl,
+                        avatarId: user.avatarId,
+                        gender: user.gender,
+                        size: 60,
+                      ),
+                      Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: palette.primary,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: palette.surface, width: 2),
+                        ),
+                        child: Icon(
+                          Icons.photo_camera,
+                          size: 11,
+                          color: palette.onPrimary,
+                        ),
+                      ),
+                    ],
                   ),
-                  child: Icon(
-                    Icons.photo_camera,
-                    size: 11,
-                    color: palette.onPrimary,
-                  ),
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      user.fullName,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: palette.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '@${user.username}',
+                      textDirection: TextDirection.ltr,
+                      style: TextStyle(color: palette.textMuted, fontSize: 13),
+                    ),
+                    if (user.phone != null)
+                      Text(
+                        user.phone!,
+                        textDirection: TextDirection.ltr,
+                        style: TextStyle(
+                          color: palette.textMuted,
+                          fontSize: 12.5,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  user.fullName,
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                    color: palette.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  '@${user.username}',
-                  textDirection: TextDirection.ltr,
-                  style: TextStyle(color: palette.textMuted, fontSize: 13),
-                ),
-                if (user.phone != null)
-                  Text(
-                    user.phone!,
-                    textDirection: TextDirection.ltr,
-                    style: TextStyle(color: palette.textMuted, fontSize: 12.5),
-                  ),
-              ],
-            ),
-          ),
-          IconButton(
-            tooltip: 'غيّر الأفاتار',
-            onPressed: () => _editProfile(context, user),
-            icon: Icon(Icons.face_retouching_natural, color: palette.textMuted),
+          const SizedBox(height: 16),
+          OutlinedButton.icon(
+            onPressed: () => _editAvatar(context, user),
+            icon: const Icon(Icons.face_retouching_natural, size: 18),
+            label: const Text('غيّر الأفاتار'),
           ),
         ],
       ),
@@ -161,14 +205,14 @@ class _ProfileCard extends StatelessWidget {
     await cubit.updateProfile({'photoUrl': picked.url});
   }
 
-  Future<void> _editProfile(BuildContext context, AppUser user) async {
+  Future<void> _editAvatar(BuildContext context, AppUser user) async {
     final cubit = context.read<AuthCubit>();
 
     final picked = await showModalBottomSheet<String>(
       context: context,
       builder: (sheetContext) => SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -221,136 +265,111 @@ class _ProfileCard extends StatelessWidget {
 }
 
 /// اختيار الثيم — تفضيل شخصي محفوظ على الجهاز، يتغيّر التطبيق كله فوراً.
-class _ThemePicker extends StatefulWidget {
-  const _ThemePicker();
-
-  @override
-  State<_ThemePicker> createState() => _ThemePickerState();
-}
-
-class _ThemePickerState extends State<_ThemePicker> {
-  final _controller = ScrollController();
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  /// عجلة الماوس عمودية، والقائمة أفقية: نحوّل الدوران إلى إزاحة أفقية،
-  /// وإلا لا يتحرك الشريط على ويندوز إلا بسحب شريط التمرير.
-  void _onWheel(PointerSignalEvent event) {
-    if (event is! PointerScrollEvent || !_controller.hasClients) return;
-
-    final delta = event.scrollDelta.dy != 0
-        ? event.scrollDelta.dy
-        : event.scrollDelta.dx;
-    final position = _controller.position;
-
-    if (delta == 0 || position.maxScrollExtent == 0) return;
-
-    // نلتقط الحدث فقط حين تتحرك القائمة فعلاً، فلا تتعطّل صفحة الإعدادات
-    // العمودية تحتها.
-    GestureBinding.instance.pointerSignalResolver.register(event, (_) {
-      _controller.jumpTo(
-        (position.pixels + delta).clamp(0.0, position.maxScrollExtent),
-      );
-    });
-  }
+class _ThemesCard extends StatelessWidget {
+  const _ThemesCard();
 
   @override
   Widget build(BuildContext context) {
     final state = context.watch<ThemeCubit>().state;
-    final current = state.palette;
 
-    return Listener(
-      onPointerSignal: _onWheel,
-      child: Scrollbar(
-        controller: _controller,
-        thumbVisibility: true,
-        child: Padding(
-          // مكان شريط التمرير تحت البطاقات لا فوقها.
-          padding: const EdgeInsets.only(bottom: 12),
-          child: _list(state, current),
-        ),
+    return SectionCard(
+      title: 'شكل التطبيق',
+      subtitle: 'بيتغيّر التطبيق كله فوراً',
+      child: ResponsiveGrid(
+        minItemWidth: 150,
+        maxColumns: 4,
+        spacing: 12,
+        children: [
+          for (final palette in state.palettes)
+            _ThemeTile(
+              palette: palette,
+              selected: palette.id == state.palette.id,
+              current: state.palette,
+            ),
+        ],
       ),
     );
   }
+}
 
-  Widget _list(ThemeState state, AppPalette current) {
-    return SizedBox(
-      height: 128,
-      child: ListView.separated(
-        controller: _controller,
-        scrollDirection: Axis.horizontal,
-        itemCount: state.palettes.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 12),
-        itemBuilder: (context, index) {
-          final palette = state.palettes[index];
-          final selected = palette.id == current.id;
+class _ThemeTile extends StatelessWidget {
+  const _ThemeTile({
+    required this.palette,
+    required this.selected,
+    required this.current,
+  });
 
-          return GestureDetector(
-            onTap: () => context.read<ThemeCubit>().select(palette),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              width: 116,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: palette.surface,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: selected ? current.primary : current.outline,
-                  width: selected ? 2.5 : 1,
+  /// ثيم البطاقة نفسها — تُرسم بألوانها لتكون معاينة.
+  final AppPalette palette;
+
+  /// الثيم المفعّل — منه لون الحدّ.
+  final AppPalette current;
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) {
+    final radius = BorderRadius.circular(AppRadius.card);
+
+    return Material(
+      color: palette.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: radius,
+        side: BorderSide(
+          color: selected ? current.primary : current.outline,
+          width: selected ? 2 : 1,
+        ),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => context.read<ThemeCubit>().select(palette),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                height: 44,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(colors: palette.headerGradient),
+                  borderRadius: BorderRadius.circular(AppRadius.control),
+                ),
+                alignment: Alignment.center,
+                child: selected
+                    ? const Icon(Icons.check_rounded, color: Colors.white)
+                    : null,
+              ),
+              const SizedBox(height: 10),
+              Text(
+                palette.name,
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 13.5,
+                  color: palette.textPrimary,
                 ),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              const SizedBox(height: 2),
+              Text(
+                palette.tagline,
+                maxLines: 2,
+                style: TextStyle(
+                  color: palette.textMuted,
+                  fontSize: 11.5,
+                  height: 1.35,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Row(
                 children: [
-                  Container(
-                    height: 38,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(colors: palette.headerGradient),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    alignment: Alignment.center,
-                    child: selected
-                        ? const Icon(Icons.check, color: Colors.white, size: 20)
-                        : null,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    palette.name,
-                    style: TextStyle(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 13.5,
-                      color: palette.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Expanded(
-                    child: Text(
-                      palette.tagline,
-                      style: TextStyle(
-                        color: palette.textMuted,
-                        fontSize: 11.5,
-                        height: 1.35,
-                      ),
-                    ),
-                  ),
-                  Row(
-                    children: [
-                      _Dot(color: palette.primary),
-                      const SizedBox(width: 4),
-                      _Dot(color: palette.secondary),
-                      const SizedBox(width: 4),
-                      _Dot(color: palette.accent),
-                    ],
-                  ),
+                  _Dot(color: palette.primary),
+                  const SizedBox(width: 4),
+                  _Dot(color: palette.secondary),
+                  const SizedBox(width: 4),
+                  _Dot(color: palette.accent),
                 ],
               ),
-            ),
-          );
-        },
+            ],
+          ),
+        ),
       ),
     );
   }

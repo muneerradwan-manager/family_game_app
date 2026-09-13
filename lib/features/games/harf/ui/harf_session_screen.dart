@@ -8,6 +8,7 @@ import '../../../../core/feedback/game_feedback.dart';
 import '../../../../core/realtime/realtime_client.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/common.dart';
+import '../../../../shared/widgets/skeleton.dart';
 import '../../../auth/cubit/auth_cubit.dart';
 import '../../data/game_repository.dart';
 import '../cubit/harf_game_cubit.dart';
@@ -162,7 +163,8 @@ class _SessionViewState extends State<_SessionView> {
           },
           builder: (context, state) {
             if (state.loading && state.snapshot == null) {
-              return const AppLoader(message: 'عم ندخّلك على اللعبة...');
+              // هيكل بشكل الجلسة لا دائرة: مكان الرأس والقائمة محجوز مسبقاً.
+              return const SessionSkeleton();
             }
 
             final snapshot = state.snapshot;

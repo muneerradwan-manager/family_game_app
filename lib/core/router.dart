@@ -13,7 +13,9 @@ import '../features/games/ui/game_config_screen.dart';
 import '../features/games/ui/game_picker_screen.dart';
 import '../features/games/ui/game_session_screen.dart';
 import '../features/settings/ui/settings_screen.dart';
+import '../shared/shell/app_shell.dart';
 import '../shared/widgets/common.dart';
+import 'theme/app_theme.dart';
 
 /// يعيد بناء التوجيه كلما تغيّرت حالة الدخول.
 class _AuthRefresh extends ChangeNotifier {
@@ -53,36 +55,44 @@ GoRouter buildRouter(AuthCubit auth) {
       GoRoute(path: '/', builder: (_, _) => const _SplashScreen()),
       GoRoute(path: '/login', builder: (_, _) => const LoginScreen()),
       GoRoute(path: '/register', builder: (_, _) => const RegisterScreen()),
-      GoRoute(path: '/home', builder: (_, _) => const HomeScreen()),
-      GoRoute(path: '/settings', builder: (_, _) => const SettingsScreen()),
-      GoRoute(
-        path: '/channels/new',
-        builder: (_, _) => const CreateChannelScreen(),
-      ),
-      GoRoute(
-        path: '/channels/:channelId',
-        builder: (_, state) =>
-            ChannelScreen(channelId: state.pathParameters['channelId']!),
+      // كل ما خارج اللعب داخل الهيكل: شريط سفلي على الجوال، وجانبي على
+      // التابلت والشاشة الكبيرة.
+      ShellRoute(
+        builder: (_, state, child) =>
+            AppShell(location: state.uri.path, child: child),
         routes: [
+          GoRoute(path: '/home', builder: (_, _) => const HomeScreen()),
+          GoRoute(path: '/settings', builder: (_, _) => const SettingsScreen()),
           GoRoute(
-            path: 'games/new',
-            builder: (_, state) =>
-                GamePickerScreen(channelId: state.pathParameters['channelId']!),
+            path: '/channels/new',
+            builder: (_, _) => const CreateChannelScreen(),
           ),
           GoRoute(
-            path: 'games/new/:gameType',
-            builder: (_, state) => GameConfigScreen(
-              channelId: state.pathParameters['channelId']!,
-              gameType: state.pathParameters['gameType']!,
-            ),
+            path: '/channels/:channelId',
+            builder: (_, state) =>
+                ChannelScreen(channelId: state.pathParameters['channelId']!),
+            routes: [
+              GoRoute(
+                path: 'games/new',
+                builder: (_, state) => GamePickerScreen(
+                  channelId: state.pathParameters['channelId']!,
+                ),
+              ),
+              GoRoute(
+                path: 'games/new/:gameType',
+                builder: (_, state) => GameConfigScreen(
+                  channelId: state.pathParameters['channelId']!,
+                  gameType: state.pathParameters['gameType']!,
+                ),
+              ),
+            ],
           ),
         ],
       ),
       // شاشة واحدة للجلسة كلها: اللوبي واللعب والنتيجة مراحل من حالة واحدة،
       // وفصلها لمسارات يفتح باب سباقات تنقّل عند تغيّر المرحلة لحظياً.
       //
-      // والمسار واحد لكل الألعاب: الموزّع يقرأ نوع اللعبة ويسلّم الشاشة
-      // لوحدتها، فإضافة لعبة لا تضيف مساراً.
+      // خارج الهيكل عمداً: اللعب يأخذ الشاشة كلها، وله أعمدته الجانبية.
       GoRoute(
         path: '/games/:gameId',
         builder: (_, state) => GameSessionScreen(
@@ -98,5 +108,31 @@ class _SplashScreen extends StatelessWidget {
   const _SplashScreen();
 
   @override
-  Widget build(BuildContext context) => const Scaffold(body: AppLoader());
+  Widget build(BuildContext context) => Scaffold(
+    body: Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const GradientMark(emoji: '🎲', size: 76),
+          const SizedBox(height: 18),
+          Text(
+            'ألعاب العيلة',
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w800,
+              color: context.palette.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 22),
+          const SizedBox(
+            width: 140,
+            child: ClipRRect(
+              borderRadius: BorderRadius.all(Radius.circular(99)),
+              child: LinearProgressIndicator(minHeight: 4),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
 }

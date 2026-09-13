@@ -6,6 +6,7 @@ import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/common.dart';
 import '../../../shared/widgets/responsive.dart';
+import '../../../shared/widgets/skeleton.dart';
 import '../data/game_repository.dart';
 
 /// شاشة شروط اللعبة.
@@ -13,6 +14,9 @@ import '../data/game_repository.dart';
 /// تعرّفها كل لعبة لنفسها (configSchema) وتعرضها المنصّة بقالب موحّد:
 /// قائمة منسدلة، أو اختيار من عدة، أو مفتاح تشغيل. اللعبة الثانية تحصل على
 /// شاشة شروط جاهزة بلا سطر واجهة واحد.
+///
+/// على الشاشة العريضة: الحقول شبكة من عمودين، وبطاقة ملخّص جانبية فيها زر
+/// فتح الغرفة — يبقى في مرمى العين بدل أن يُدفع لأسفل الصفحة.
 class GameConfigScreen extends StatefulWidget {
   const GameConfigScreen({
     super.key,
@@ -31,6 +35,8 @@ class _GameConfigScreenState extends State<GameConfigScreen> {
   late Future<GameCatalogEntry> _entry;
   final _values = <String, Object?>{};
   bool _opening = false;
+
+  static const _splitWidth = 900.0;
 
   @override
   void initState() {
@@ -73,13 +79,25 @@ class _GameConfigScreenState extends State<GameConfigScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final split = MediaQuery.sizeOf(context).width >= _splitWidth;
+
     return Scaffold(
-      appBar: AppBar(title: const Text('شروط اللعبة')),
       body: FutureBuilder<GameCatalogEntry>(
         future: _entry,
         builder: (context, snapshot) {
           if (snapshot.connectionState != ConnectionState.done) {
-            return const AppLoader();
+            return ListView(
+              padding: context.pagePadding(),
+              children: [
+                const PageHeaderSkeleton(),
+                const SizedBox(height: 24),
+                TwoPane(
+                  breakpoint: _splitWidth - 100,
+                  main: const FormCardSkeleton(fields: 3),
+                  side: const GameCardSkeleton(),
+                ),
+              ],
+            );
           }
 
           if (!snapshot.hasData) {
@@ -91,52 +109,171 @@ class _GameConfigScreenState extends State<GameConfigScreen> {
 
           final entry = snapshot.data!;
 
+          final header = PageHeader(
+            leading: const AppBackButton(),
+            title: 'شروط ${entry.name}',
+            subtitle: 'اضبط الشروط وافتح الغرفة لأهل القناة',
+          );
+
+          final fields = [
+            for (final field in entry.configSchema)
+              _ConfigFieldView(
+                field: field,
+                value: _values[field.key],
+                // الوضع المرن يفرض أعمدته ووقته، فيُخفي ما لا معنى له معه.
+                disabled:
+                    _values['flexibleMode'] == true &&
+                    (field.key == 'sixthColumn' || field.key == 'writeSeconds'),
+                onChanged: (value) =>
+                    setState(() => _values[field.key] = value),
+              ),
+          ];
+
+          final openButton = FilledButton.icon(
+            onPressed: _opening ? null : _openRoom,
+            icon: _opening
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.2,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Icon(Icons.meeting_room_outlined),
+            label: const Text('افتح الغرفة'),
+          );
+
+          if (split) {
+            return ListView(
+              padding: context.pagePadding(),
+              children: [
+                header,
+                const SizedBox(height: 24),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: ResponsiveGrid(
+                        minItemWidth: 300,
+                        maxColumns: 2,
+                        children: fields,
+                      ),
+                    ),
+                    const SizedBox(width: 20),
+                    SizedBox(
+                      width: 360,
+                      child: _SummaryCard(entry: entry, button: openButton),
+                    ),
+                  ],
+                ),
+              ],
+            );
+          }
+
           return Column(
             children: [
               Expanded(
                 child: ListView(
-                  padding: context.contentPadding(bottom: 12),
+                  padding: context.contentPadding(
+                    top: MediaQuery.paddingOf(context).top + 24,
+                    bottom: 16,
+                    minHorizontal: 16,
+                    maxWidth: ContentWidth.wide,
+                  ),
                   children: [
-                    for (final field in entry.configSchema) ...[
-                      _ConfigFieldView(
-                        field: field,
-                        value: _values[field.key],
-                        // الوضع المرن يفرض أعمدته ووقته، فيُخفي ما لا معنى له معه.
-                        disabled:
-                            _values['flexibleMode'] == true &&
-                            (field.key == 'sixthColumn' ||
-                                field.key == 'writeSeconds'),
-                        onChanged: (value) =>
-                            setState(() => _values[field.key] = value),
-                      ),
-                      const SizedBox(height: 18),
+                    header,
+                    const SizedBox(height: 20),
+                    for (final field in fields) ...[
+                      field,
+                      const SizedBox(height: 14),
                     ],
                     const _DurationNote(),
                   ],
                 ),
               ),
-              SafeArea(
-                child: Padding(
-                  padding: context.contentPadding(top: 8, bottom: 16),
-                  child: FilledButton.icon(
-                    onPressed: _opening ? null : _openRoom,
-                    icon: _opening
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2.2,
-                              color: Colors.white,
-                            ),
-                          )
-                        : const Icon(Icons.meeting_room_outlined),
-                    label: const Text('افتح الغرفة'),
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  color: context.palette.surface,
+                  border: Border(
+                    top: BorderSide(color: context.palette.outline),
+                  ),
+                ),
+                child: SafeArea(
+                  top: false,
+                  child: Padding(
+                    padding: context.contentPadding(
+                      top: 12,
+                      bottom: 12,
+                      minHorizontal: 16,
+                    ),
+                    child: openButton,
                   ),
                 ),
               ),
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+class _SummaryCard extends StatelessWidget {
+  const _SummaryCard({required this.entry, required this.button});
+
+  final GameCatalogEntry entry;
+  final Widget button;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+
+    return SectionCard(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              GradientMark(emoji: entry.icon, size: 56),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      entry.name,
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: palette.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    InfoChip(
+                      'من ${entry.minPlayers} لـ ${entry.maxPlayers} لاعبين',
+                      icon: Icons.people_outline,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            entry.description,
+            style: TextStyle(
+              color: palette.textMuted,
+              fontSize: 13.5,
+              height: 1.55,
+            ),
+          ),
+          const SizedBox(height: 16),
+          const _DurationNote(),
+          const SizedBox(height: 18),
+          button,
+        ],
       ),
     );
   }
@@ -173,7 +310,7 @@ class _ConfigFieldView extends StatelessWidget {
                     child: Text(
                       field.label,
                       style: TextStyle(
-                        fontSize: 16,
+                        fontSize: 15.5,
                         fontWeight: FontWeight.w800,
                         color: palette.textPrimary,
                       ),
@@ -238,15 +375,19 @@ class _ChoiceChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
+    final radius = BorderRadius.circular(AppRadius.control);
 
     return Material(
-      color: selected ? palette.primary : palette.surfaceAlt,
-      borderRadius: BorderRadius.circular(14),
+      color: selected ? palette.primary : palette.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: radius,
+        side: BorderSide(color: selected ? palette.primary : palette.outline),
+      ),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: radius,
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 14),
+          padding: const EdgeInsets.symmetric(vertical: 13),
           child: Center(
             child: Text(
               label,
@@ -283,9 +424,10 @@ class _SelectField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
+    final radius = BorderRadius.circular(AppRadius.control);
 
     return InkWell(
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: radius,
       onTap: () async {
         final picked = await showModalBottomSheet<Object?>(
           context: context,
@@ -293,7 +435,7 @@ class _SelectField extends StatelessWidget {
           builder: (sheetContext) => SafeArea(
             child: ListView(
               shrinkWrap: true,
-              padding: const EdgeInsets.symmetric(vertical: 12),
+              padding: const EdgeInsets.only(bottom: 12),
               children: [
                 for (final option in field.options)
                   ListTile(
@@ -316,10 +458,11 @@ class _SelectField extends StatelessWidget {
         if (picked != null || value != null) onChanged(picked);
       },
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
         decoration: BoxDecoration(
-          color: palette.surfaceAlt,
-          borderRadius: BorderRadius.circular(14),
+          color: palette.surface,
+          borderRadius: radius,
+          border: Border.all(color: palette.outline),
         ),
         child: Row(
           children: [
@@ -349,9 +492,14 @@ class _DurationNote extends StatelessWidget {
   const _DurationNote();
 
   @override
-  Widget build(BuildContext context) => SectionCard(
-    color: context.palette.surfaceAlt,
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(14),
+    decoration: BoxDecoration(
+      color: context.palette.surfaceAlt,
+      borderRadius: BorderRadius.circular(AppRadius.control),
+    ),
     child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Icon(Icons.schedule, size: 20, color: context.palette.textMuted),
         const SizedBox(width: 10),

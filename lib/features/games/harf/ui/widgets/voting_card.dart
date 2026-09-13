@@ -3,8 +3,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../../core/theme/app_theme.dart';
 import '../../../../../shared/widgets/common.dart';
-import '../../../../../shared/widgets/responsive.dart';
+import '../../../../../shared/widgets/skeleton.dart';
 import '../../cubit/harf_game_cubit.dart';
+import 'harf_layout.dart';
 
 /// التصويت على اعتراض واحد — واحد في كل مرة لا دفعة واحدة.
 ///
@@ -21,7 +22,8 @@ class VotingCard extends StatelessWidget {
     final palette = context.palette;
 
     if (objection == null) {
-      return const AppLoader(message: 'عم نجهّز الاعتراض...');
+      // هيكل بطاقة التصويت نفسها: الاعتراض يصل خلال لحظة ويأخذ مكانها.
+      return const HarfPaneCenter(child: FormCardSkeleton(fields: 2));
     }
 
     final canVote =
@@ -29,34 +31,24 @@ class VotingCard extends StatelessWidget {
         !objection.hasVoted &&
         state.snapshot!.me.isPlayer;
 
-    return SingleChildScrollView(
-      padding: context.contentPadding(
-        top: 24,
-        bottom: 24,
-        minHorizontal: 24,
-        maxWidth: ContentWidth.form,
-      ),
+    return HarfPaneCenter(
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
           if (objection.total > 1)
             Padding(
               padding: const EdgeInsets.only(bottom: 14),
               child: InfoChip(
                 'اعتراض ${objection.index} من ${objection.total}',
+                color: palette.warning,
+                icon: Icons.gavel_outlined,
               ),
             ),
           SectionCard(
+            title: 'اعتراض من ${objection.byUsername}',
+            padding: const EdgeInsets.all(20),
             child: Column(
               children: [
-                Text(
-                  'اعتراض من ${objection.byUsername}',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: palette.textMuted,
-                  ),
-                ),
-                const SizedBox(height: 16),
                 Text.rich(
                   TextSpan(
                     style: TextStyle(
@@ -84,7 +76,7 @@ class VotingCard extends StatelessWidget {
                   ),
                   decoration: BoxDecoration(
                     color: palette.surfaceAlt,
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(AppRadius.card),
                   ),
                   child: Text(
                     objection.answer,
@@ -113,7 +105,7 @@ class VotingCard extends StatelessWidget {
                         child: _VoteButton(
                           label: 'صح',
                           emoji: '✅',
-                          color: const Color(0xFF2E7D32),
+                          color: palette.success,
                           onTap: () => cubit.castVote(answerIsValid: true),
                         ),
                       ),
@@ -122,7 +114,7 @@ class VotingCard extends StatelessWidget {
                         child: _VoteButton(
                           label: 'خطأ',
                           emoji: '❌',
-                          color: palette.accent,
+                          color: palette.danger,
                           onTap: () => cubit.castVote(answerIsValid: false),
                         ),
                       ),
@@ -134,7 +126,7 @@ class VotingCard extends StatelessWidget {
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
                       color: palette.surfaceAlt,
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(AppRadius.control),
                     ),
                     child: Text(
                       objection.isParty
@@ -169,29 +161,36 @@ class _VoteButton extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) => Material(
-    color: color.withValues(alpha: 0.12),
-    borderRadius: BorderRadius.circular(16),
-    child: InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 18),
-        child: Column(
-          children: [
-            Text(emoji, style: const TextStyle(fontSize: 26)),
-            const SizedBox(height: 6),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w800,
-                color: color,
+  Widget build(BuildContext context) {
+    final radius = BorderRadius.circular(AppRadius.card);
+
+    return Material(
+      color: color.withValues(alpha: 0.10),
+      shape: RoundedRectangleBorder(
+        borderRadius: radius,
+        side: BorderSide(color: color.withValues(alpha: 0.35)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 18),
+          child: Column(
+            children: [
+              Text(emoji, style: const TextStyle(fontSize: 26)),
+              const SizedBox(height: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: color,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
-    ),
-  );
+    );
+  }
 }

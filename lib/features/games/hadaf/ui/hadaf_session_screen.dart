@@ -8,6 +8,7 @@ import '../../../../core/feedback/game_feedback.dart';
 import '../../../../core/realtime/realtime_client.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/common.dart';
+import '../../../../shared/widgets/skeleton.dart';
 import '../../../auth/cubit/auth_cubit.dart';
 import '../../data/game_repository.dart';
 import '../cubit/hadaf_game_cubit.dart';
@@ -169,7 +170,7 @@ class _SessionViewState extends State<_SessionView> {
           },
           builder: (context, state) {
             if (state.loading && state.snapshot == null) {
-              return const AppLoader(message: 'عم ندخّلك على اللعبة...');
+              return const SessionSkeleton();
             }
 
             final snapshot = state.snapshot;
@@ -213,25 +214,34 @@ class _SessionViewState extends State<_SessionView> {
 }
 
 /// انقطاع الاتصال يجب أن يُرى — وفي لعبة سرعة هو أهم ما يُرى.
+///
+/// بلون «تحذير» الثابت لا بلون الثيم: هي حالة لا زينة، ومعناها لا يتبدّل مع
+/// ذوق المستخدم.
 class _OfflineBanner extends StatelessWidget {
   const _OfflineBanner();
 
   @override
   Widget build(BuildContext context) => Container(
     width: double.infinity,
-    color: context.palette.accent,
+    color: context.palette.warning,
     padding: EdgeInsets.only(
       top: MediaQuery.paddingOf(context).top + 6,
       bottom: 6,
     ),
-    child: const Text(
-      'عم نحاول نرجع الاتصال...',
-      textAlign: TextAlign.center,
-      style: TextStyle(
-        color: Colors.white,
-        fontWeight: FontWeight.w700,
-        fontSize: 13,
-      ),
+    child: const Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(Icons.wifi_off_rounded, color: Colors.white, size: 16),
+        SizedBox(width: 8),
+        Text(
+          'عم نحاول نرجع الاتصال...',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w700,
+            fontSize: 13,
+          ),
+        ),
+      ],
     ),
   );
 }

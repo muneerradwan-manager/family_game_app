@@ -1,16 +1,23 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/common.dart';
+import '../../../shared/widgets/responsive.dart';
+import '../../../shared/widgets/skeleton.dart';
 import '../../announcements/cubit/announcements_cubit.dart';
 import '../../announcements/ui/announcements_banner.dart';
 import '../../auth/cubit/auth_cubit.dart';
+import '../../games/game_kind.dart';
 import '../cubit/channels_cubit.dart';
 import '../model/channel.dart';
+import 'join_by_code.dart';
 
+/// الرئيسية: لوحة بأسلوب «نظرة عامة» في لوحة الإدارة.
+///
+/// أرقام سريعة، ثم الألعاب الشغّالة الآن (أهم ما قد يفتح المستخدم التطبيق
+/// لأجله)، ثم شبكة القنوات: عمود على الجوال، وحتى ثلاثة على الشاشة الكبيرة.
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -31,104 +38,193 @@ class _HomeScreenState extends State<HomeScreen> {
     context.read<AnnouncementsCubit>().load(),
   ]);
 
-  Future<void> _joinByCode() async {
-    final code = await showModalBottomSheet<String>(
-      context: context,
-      isScrollControlled: true,
-      builder: (_) => const _JoinByCodeSheet(),
-    );
-
-    if (code == null || !mounted) return;
-
-    final channel = await context.read<ChannelsCubit>().joinByCode(code);
-
-    if (!mounted) return;
-
-    if (channel != null) {
-      context.push('/channels/${channel.id}');
-    } else {
-      final error = context.read<ChannelsCubit>().state.error;
-
-      if (error != null) {
-        showAppSnack(context, error, isError: true);
-        context.read<ChannelsCubit>().clearError();
-      }
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final user = context.select((AuthCubit cubit) => cubit.state.user);
+    final state = context.watch<ChannelsCubit>().state;
+
+    final fullName = user?.fullName.trim() ?? '';
+    final firstName = fullName.isNotEmpty
+        ? fullName.split(' ').first
+        : (user?.username ?? '');
 
     return Scaffold(
-      body: Column(
-        children: [
-          GradientHeader(
-            title: 'أهلاً ${user?.username ?? ''}',
-            subtitle: 'قنواتك وألعابك',
-            trailing: IconButton(
-              onPressed: () => context.push('/settings'),
-              icon: const Icon(Icons.settings_outlined, color: Colors.white),
-              tooltip: 'الإعدادات',
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: _HeaderAction(
-                    icon: Icons.add_circle_outline,
-                    label: 'إنشاء قناة',
-                    onTap: () => context.push('/channels/new'),
-                  ),
+      body: RefreshIndicator(
+        onRefresh: _reload,
+        child: ListView(
+          // التمرير متاح حتى حين يقصر المحتوى: السحب للتحديث يحتاجه.
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: context.pagePadding(),
+          children: [
+            PageHeader(
+              title: 'أهلاً $firstName 👋',
+              subtitle: 'قنواتك وألعابك بمكان واحد',
+              actions: [
+                OutlinedButton.icon(
+                  style: AppButtonStyle.compact,
+                  onPressed: () => joinChannelByCode(context),
+                  icon: const Icon(Icons.vpn_key_outlined, size: 18),
+                  label: const Text('انضمام برمز'),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _HeaderAction(
-                    icon: Icons.vpn_key_outlined,
-                    label: 'انضمام برمز',
-                    onTap: _joinByCode,
-                  ),
+                FilledButton.icon(
+                  style: AppButtonStyle.compact,
+                  onPressed: () => context.push('/channels/new'),
+                  icon: const Icon(Icons.add_rounded, size: 18),
+                  label: const Text('قناة جديدة'),
                 ),
               ],
             ),
+            const SizedBox(height: 22),
+            const AnnouncementsBanner(padding: EdgeInsets.only(bottom: 8)),
+            _content(context, state),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _content(BuildContext context, ChannelsState state) {
+    if (state.loading && state.channels.isEmpty) return const _HomeSkeleton();
+
+    if (state.error != null && state.channels.isEmpty) {
+      return SectionCard(
+        child: AppErrorView(
+          message: state.error!,
+          onRetry: () => context.read<ChannelsCubit>().load(),
+        ),
+      );
+    }
+
+    if (state.channels.isEmpty) {
+      return SectionCard(
+        child: EmptyState(
+          emoji: '👨‍👩‍👧‍👦',
+          title: 'لسا ما عندك قنوات',
+          subtitle:
+              'القناة هي مجموعة العيلة أو الشباب اللي بتلعبوا فيها.\nأنشئ وحدة وابعت الرمز لأهلك.',
+          action: FilledButton.icon(
+            style: AppButtonStyle.compact,
+            onPressed: () => context.push('/channels/new'),
+            icon: const Icon(Icons.add_rounded, size: 18),
+            label: const Text('أنشئ أول قناة'),
           ),
-          AnnouncementsBanner(padding: context.listPadding(top: 14, bottom: 0)),
-          Expanded(
-            child: BlocBuilder<ChannelsCubit, ChannelsState>(
-              builder: (context, state) {
-                if (state.loading && state.channels.isEmpty) {
-                  return const AppLoader(message: 'عم نجيب قنواتك...');
-                }
+        ),
+      );
+    }
 
-                if (state.error != null && state.channels.isEmpty) {
-                  return AppErrorView(
-                    message: state.error!,
-                    onRetry: () => context.read<ChannelsCubit>().load(),
-                  );
-                }
+    final palette = context.palette;
+    final channels = state.channels;
+    final live = channels.where((channel) => channel.activeGame != null);
+    final compact = context.isPhone;
 
-                if (state.channels.isEmpty) {
-                  return const SingleChildScrollView(
-                    child: EmptyState(
-                      emoji: '👨‍👩‍👧‍👦',
-                      title: 'لسا ما عندك قنوات',
-                      subtitle:
-                          'القناة هي مجموعة العيلة أو الشباب اللي بتلعبوا فيها.\nأنشئ وحدة وابعت الرمز لأهلك.',
-                    ),
-                  );
-                }
-
-                return RefreshIndicator(
-                  onRefresh: _reload,
-                  child: ListView.separated(
-                    padding: context.listPadding(bottom: 32),
-                    itemCount: state.channels.length,
-                    separatorBuilder: (_, _) => const SizedBox(height: 12),
-                    itemBuilder: (context, index) =>
-                        _ChannelTile(channel: state.channels[index]),
-                  ),
-                );
-              },
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        ResponsiveGrid(
+          minItemWidth: compact ? 96 : 200,
+          spacing: compact ? 10 : 16,
+          children: [
+            StatCard(
+              label: 'القنوات',
+              value: '${channels.length}',
+              icon: Icons.groups_outlined,
+              compact: compact,
             ),
+            StatCard(
+              label: 'شغّالة هلق',
+              value: '${live.length}',
+              icon: Icons.sports_esports_outlined,
+              tone: palette.success,
+              compact: compact,
+            ),
+            StatCard(
+              label: 'الأعضاء',
+              value:
+                  '${channels.fold<int>(0, (sum, channel) => sum + channel.memberCount)}',
+              icon: Icons.people_outline,
+              tone: palette.accent,
+              compact: compact,
+            ),
+          ],
+        ),
+        if (live.isNotEmpty) ...[
+          const SizedBox(height: 28),
+          const SectionTitle('🎮 شغّالة هلق'),
+          ResponsiveGrid(
+            minItemWidth: 300,
+            children: [
+              for (final channel in live) _LiveGameCard(channel: channel),
+            ],
+          ),
+        ],
+        const SizedBox(height: 28),
+        SectionTitle('قنواتي (${channels.length})'),
+        ResponsiveGrid(
+          minItemWidth: 290,
+          children: [
+            for (final channel in channels) _ChannelCard(channel: channel),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _LiveGameCard extends StatelessWidget {
+  const _LiveGameCard({required this.channel});
+
+  final Channel channel;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final game = channel.activeGame!;
+
+    return SectionCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: [
+              GradientMark(emoji: GameKind.iconOf(game.gameType), size: 46),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      GameKind.nameOf(game.gameType),
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 15.5,
+                        color: palette.textPrimary,
+                      ),
+                    ),
+                    Text(
+                      game.isLobby
+                          ? '${channel.name} · ${game.startedByUsername ?? 'حدا'} فتح غرفة'
+                          : '${channel.name} · ${game.playerCount} لاعبين',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(color: palette.textMuted, fontSize: 13),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              InfoChip(
+                game.isLobby ? 'لوبي' : 'تلعب',
+                color: game.isLobby ? palette.warning : palette.success,
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          FilledButton(
+            onPressed: () =>
+                context.push('/games/${game.id}?type=${game.gameType}'),
+            // المتأخر يتفرّج فقط: القائمة تُقفل لحظة "ابدأ".
+            child: Text(game.isLobby ? 'انضم للعبة' : 'تفرّج'),
           ),
         ],
       ),
@@ -136,90 +232,43 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-class _HeaderAction extends StatelessWidget {
-  const _HeaderAction({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) => Material(
-    color: Colors.white.withValues(alpha: 0.18),
-    borderRadius: BorderRadius.circular(16),
-    child: InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        child: Column(
-          children: [
-            Icon(icon, color: Colors.white, size: 22),
-            const SizedBox(height: 6),
-            Text(
-              label,
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w700,
-                fontSize: 13.5,
-              ),
-            ),
-          ],
-        ),
-      ),
-    ),
-  );
-}
-
-class _ChannelTile extends StatelessWidget {
-  const _ChannelTile({required this.channel});
+class _ChannelCard extends StatelessWidget {
+  const _ChannelCard({required this.channel});
 
   final Channel channel;
 
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
-    final active = channel.activeGame;
-    final hasPhoto = channel.photoUrl != null && channel.photoUrl!.isNotEmpty;
+    final game = channel.activeGame;
+
+    final status = game == null
+        ? InfoChip(
+            'ما في لعبة هلق',
+            color: palette.textMuted,
+            icon: Icons.bedtime_outlined,
+          )
+        : game.isLobby
+        ? InfoChip(
+            'غرفة مفتوحة — انضم',
+            color: palette.warning,
+            icon: Icons.meeting_room_outlined,
+          )
+        : InfoChip(
+            '${GameKind.nameOf(game.gameType)} · ${game.playerCount} لاعبين',
+            color: palette.success,
+            icon: Icons.sports_esports_outlined,
+          );
 
     return SectionCard(
       onTap: () => context.push('/channels/${channel.id}'),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Row(
             children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  gradient: hasPhoto
-                      ? null
-                      : LinearGradient(colors: palette.headerGradient),
-                  borderRadius: BorderRadius.circular(14),
-                  image: hasPhoto
-                      ? DecorationImage(
-                          image: NetworkImage(channel.photoUrl!),
-                          fit: BoxFit.cover,
-                        )
-                      : null,
-                ),
-                alignment: Alignment.center,
-                child: hasPhoto
-                    ? null
-                    : Text(
-                        channel.name.characters.first,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-              ),
+              ChannelAvatar(name: channel.name, photoUrl: channel.photoUrl),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
@@ -227,13 +276,15 @@ class _ChannelTile extends StatelessWidget {
                   children: [
                     Text(
                       channel.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        fontSize: 17,
+                        fontSize: 16,
                         fontWeight: FontWeight.w800,
                         color: palette.textPrimary,
                       ),
                     ),
-                    const SizedBox(height: 3),
+                    const SizedBox(height: 2),
                     Text(
                       '${channel.memberCount} أعضاء',
                       style: TextStyle(color: palette.textMuted, fontSize: 13),
@@ -244,115 +295,58 @@ class _ChannelTile extends StatelessWidget {
               Icon(Icons.chevron_right, color: palette.textMuted),
             ],
           ),
-          // بطاقة اللعبة الجارية: تتحدّث لحظياً عبر القناة الحيّة.
-          if (active != null) ...[
-            const SizedBox(height: 14),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              decoration: BoxDecoration(
-                color: palette.accent.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.sports_esports, color: palette.accent, size: 20),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      active.isLobby
-                          ? 'في غرفة مفتوحة — انضم!'
-                          : 'لعبة جارية — ${active.playerCount} لاعبين',
-                      style: TextStyle(
-                        color: palette.accent,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 13.5,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+          Padding(
+            padding: const EdgeInsets.only(top: 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Divider(height: 1),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Flexible(child: status),
+                    const Spacer(),
+                    if (channel.isOwner)
+                      InfoChip('مالك', color: palette.textMuted),
+                  ],
+                ),
+              ],
             ),
-          ],
+          ),
         ],
       ),
     );
   }
 }
 
-class _JoinByCodeSheet extends StatefulWidget {
-  const _JoinByCodeSheet();
+class _HomeSkeleton extends StatelessWidget {
+  const _HomeSkeleton();
 
   @override
-  State<_JoinByCodeSheet> createState() => _JoinByCodeSheetState();
-}
+  Widget build(BuildContext context) {
+    final compact = context.isPhone;
 
-class _JoinByCodeSheetState extends State<_JoinByCodeSheet> {
-  final _controller = TextEditingController();
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    // viewInsets للكيبورد، و bottomInset لشريط تنقّل النظام. الأول يصفّر
-    // الثاني حين يفتح الكيبورد، فأخذ الأكبر منهما هو الصحيح لا جمعهما.
-    padding: EdgeInsets.only(
-      left: 24,
-      right: 24,
-      top: 24,
-      bottom:
-          24 +
-          (MediaQuery.viewInsetsOf(context).bottom > 0
-              ? MediaQuery.viewInsetsOf(context).bottom
-              : context.bottomInset),
-    ),
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          'انضمام برمز دعوة',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w800,
-            color: context.palette.textPrimary,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          'اكتب الرمز اللي وصلك من أهل القناة',
-          style: TextStyle(color: context.palette.textMuted),
-        ),
-        const SizedBox(height: 18),
-        TextField(
-          controller: _controller,
-          autofocus: true,
-          textAlign: TextAlign.center,
-          textCapitalization: TextCapitalization.characters,
-          inputFormatters: [
-            FilteringTextInputFormatter.allow(RegExp('[A-Za-z0-9]')),
-            LengthLimitingTextInputFormatter(6),
-            TextInputFormatter.withFunction(
-              (_, next) => next.copyWith(text: next.text.toUpperCase()),
-            ),
+        ResponsiveGrid(
+          minItemWidth: compact ? 96 : 200,
+          spacing: compact ? 10 : 16,
+          children: [
+            for (var index = 0; index < 3; index++)
+              StatCardSkeleton(compact: compact),
           ],
-          style: const TextStyle(
-            fontSize: 26,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 8,
-          ),
-          decoration: const InputDecoration(hintText: 'ABC123'),
-          onSubmitted: (value) => Navigator.of(context).pop(value),
         ),
-        const SizedBox(height: 20),
-        FilledButton(
-          onPressed: () => Navigator.of(context).pop(_controller.text),
-          child: const Text('انضم'),
+        const SizedBox(height: 30),
+        const Shimmer(child: SkeletonBox(width: 120, height: 18)),
+        const SizedBox(height: 14),
+        ResponsiveGrid(
+          minItemWidth: 290,
+          children: [
+            for (var index = 0; index < 6; index++) const ChannelCardSkeleton(),
+          ],
         ),
       ],
-    ),
-  );
+    );
+  }
 }

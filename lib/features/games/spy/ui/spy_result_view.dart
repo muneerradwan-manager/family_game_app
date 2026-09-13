@@ -10,11 +10,14 @@ import '../../../../core/network/api_exception.dart';
 import '../../../../core/theme/app_palette.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/common.dart';
+import '../../../../shared/widgets/game_layout.dart';
 import '../../../../shared/widgets/responsive.dart';
+import '../../../../shared/widgets/skeleton.dart';
 import '../../data/game_repository.dart';
 import '../../harf/ui/widgets/result_share_card.dart' show renderShareCard;
 import '../cubit/spy_game_cubit.dart';
 import '../model/spy_models.dart';
+import 'widgets/spy_layout.dart';
 import 'widgets/spy_share_card.dart';
 import 'widgets/transcript_view.dart';
 
@@ -22,6 +25,9 @@ import 'widgets/transcript_view.dart';
 ///
 /// زر "كمان لعبة؟" هو أعلى رافعة لإعادة اللعب: يفتح غرفة جديدة بنفس
 /// الإعدادات بدل إعادة المرور بشاشتي الاختيار والشروط.
+///
+/// على الشاشة العريضة الأزرار وتاريخ الطرد في العمود الجانبي: الكشف
+/// والتفاصيل تملأ الوسط، والخطوة التالية في مرمى العين بلا تمرير.
 class SpyResultView extends StatefulWidget {
   const SpyResultView({super.key});
 
@@ -74,125 +80,137 @@ class _SpyResultViewState extends State<SpyResultView> {
 
     _palette = palette;
 
-    if (result == null) {
-      return const AppLoader(message: 'عم نجهّز النتيجة...');
-    }
+    if (result == null) return const SessionSkeleton();
+
+    final split = SessionBody.isSplit(context);
+
+    final playAgain = FilledButton.icon(
+      onPressed: _opening ? null : _playAgain,
+      icon: _opening
+          ? const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(
+                strokeWidth: 2.2,
+                color: Colors.white,
+              ),
+            )
+          : const Icon(Icons.replay),
+      label: const Text('كمان لعبة؟'),
+    );
+
+    final share = OutlinedButton.icon(
+      onPressed: _sharing ? null : () => _share(result, snapshot),
+      icon: _sharing
+          ? const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : const Icon(Icons.share, size: 18),
+      label: const Text('مشاركة'),
+    );
+
+    final backToChannel = OutlinedButton(
+      onPressed: () => context.go('/channels/${snapshot.channelId}'),
+      child: const Text('رجوع للقناة'),
+    );
+
+    final ejections = result.ejections.isEmpty
+        ? null
+        : _EjectionsCard(ejections: result.ejections);
 
     return Column(
       children: [
-        _ResultHeader(result: result),
+        SessionHeader(
+          title: 'نتيجة لعبة الجاسوس',
+          subtitle: result.categoryLabel == null
+              ? null
+              : '${result.categoryEmoji ?? ''} ${result.categoryLabel}',
+          emoji: '🕵️',
+          showBack: false,
+          stats: [
+            SessionStat('${result.roundsPlayed}', 'جولات'),
+            SessionStat('${result.players.length}', 'لاعبين'),
+            SessionStat('${result.ejections.length}', 'انطردوا'),
+          ],
+        ),
         Expanded(
-          child: ListView(
-            padding: context.contentPadding(bottom: 12),
-            children: [
-              _SecretReveal(result: result),
-              const SizedBox(height: 20),
-              if (result.guess != null) ...[
-                _GuessCard(guess: result.guess!, word: result.word),
-                const SizedBox(height: 20),
-              ],
-              const SectionTitle('اللاعبين'),
-              for (final player in result.players)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: _PlayerRow(player: player),
+          child: SpyBody(
+            main: SpyStage(
+              maxWidth: split ? 820 : ContentWidth.standard,
+              children: [
+                _OutcomeHero(result: result),
+                const SizedBox(height: 16),
+                _SecretReveal(result: result),
+                const SizedBox(height: 16),
+                if (result.guess != null) ...[
+                  _GuessCard(guess: result.guess!, word: result.word),
+                  const SizedBox(height: 16),
+                ],
+                const SectionTitle('اللاعبين'),
+                ResponsiveGrid(
+                  minItemWidth: 280,
+                  maxColumns: 2,
+                  spacing: 10,
+                  children: [
+                    for (final player in result.players)
+                      _PlayerRow(player: player),
+                  ],
                 ),
-              if (result.ejections.isNotEmpty) ...[
-                const SizedBox(height: 10),
-                const SectionTitle('مين طلع بأي جولة'),
+                if (!split && ejections != null) ...[
+                  const SizedBox(height: 20),
+                  ejections,
+                ],
+                if (snapshot.transcript.isNotEmpty) ...[
+                  const SizedBox(height: 20),
+                  const SectionTitle('كل الأسئلة'),
+                  TranscriptView(
+                    turns: snapshot.transcript,
+                    viewerId: cubit.viewerId,
+                    compact: true,
+                  ),
+                ],
+              ],
+            ),
+            side: SidePanel(
+              children: [
                 SectionCard(
-                  padding: const EdgeInsets.symmetric(vertical: 6),
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      for (final ejection in result.ejections)
-                        ListTile(
-                          dense: true,
-                          leading: Text(
-                            ejection.wasSpy ? '🕵️' : '🙅',
-                            style: const TextStyle(fontSize: 20),
-                          ),
-                          title: Text(
-                            ejection.username,
-                            style: TextStyle(
-                              fontWeight: FontWeight.w700,
-                              color: palette.textPrimary,
-                            ),
-                          ),
-                          subtitle: Text(
-                            'جولة ${ejection.round} · ${ejection.votes} أصوات',
-                            style: TextStyle(
-                              color: palette.textMuted,
-                              fontSize: 12.5,
-                            ),
-                          ),
-                        ),
+                      playAgain,
+                      const SizedBox(height: 10),
+                      share,
+                      const SizedBox(height: 10),
+                      backToChannel,
                     ],
                   ),
                 ),
-              ],
-              if (snapshot.transcript.isNotEmpty) ...[
-                const SizedBox(height: 10),
-                const SectionTitle('كل الأسئلة'),
-                TranscriptView(
-                  turns: snapshot.transcript,
-                  viewerId: cubit.viewerId,
-                  compact: true,
-                ),
-              ],
-            ],
-          ),
-        ),
-        SafeArea(
-          child: Padding(
-            padding: context.contentPadding(top: 4, bottom: 12),
-            child: Column(
-              children: [
-                FilledButton.icon(
-                  onPressed: _opening ? null : _playAgain,
-                  icon: _opening
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2.2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Icon(Icons.replay),
-                  label: const Text('كمان لعبة؟'),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: _sharing
-                            ? null
-                            : () => _share(result, snapshot),
-                        icon: _sharing
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Icon(Icons.share, size: 18),
-                        label: const Text('مشاركة'),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () =>
-                            context.go('/channels/${snapshot.channelId}'),
-                        child: const Text('رجوع للقناة'),
-                      ),
-                    ),
-                  ],
-                ),
+                if (ejections != null) ...[
+                  const SizedBox(height: 16),
+                  ejections,
+                ],
               ],
             ),
+            // على العرض الضيق الأزرار تذييل ثابت كما كانت؛ على العريض هي
+            // في العمود الجانبي فلا تُكرَّر أسفل الشاشة.
+            footer: split
+                ? null
+                : Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      playAgain,
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(child: share),
+                          const SizedBox(width: 10),
+                          Expanded(child: backToChannel),
+                        ],
+                      ),
+                    ],
+                  ),
           ),
         ),
       ],
@@ -243,8 +261,9 @@ class _SpyResultViewState extends State<SpyResultView> {
   ].join('\n');
 }
 
-class _ResultHeader extends StatelessWidget {
-  const _ResultHeader({required this.result});
+/// من فاز — اللحظة الدرامية الأخيرة، ولهذا وحدها تحتفظ بتدرّج الثيم.
+class _OutcomeHero extends StatelessWidget {
+  const _OutcomeHero({required this.result});
 
   final SpyResult result;
 
@@ -253,20 +272,14 @@ class _ResultHeader extends StatelessWidget {
     final palette = context.palette;
 
     return Container(
-      width: double.infinity,
-      padding: EdgeInsets.only(
-        top: MediaQuery.paddingOf(context).top + 24,
-        bottom: 28,
-        left: 20,
-        right: 20,
-      ),
+      padding: const EdgeInsets.symmetric(vertical: 26, horizontal: 20),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: palette.headerGradient,
           begin: AlignmentDirectional.topStart,
           end: AlignmentDirectional.bottomEnd,
         ),
-        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(32)),
+        borderRadius: BorderRadius.circular(AppRadius.card),
       ),
       child: Column(
         children: [
@@ -274,8 +287,8 @@ class _ResultHeader extends StatelessWidget {
             'spy' => '🕵️',
             'players' => '🎉',
             _ => '🏁',
-          }, style: const TextStyle(fontSize: 54)),
-          const SizedBox(height: 10),
+          }, style: const TextStyle(fontSize: 50)),
+          const SizedBox(height: 8),
           Text(
             switch (result.winner) {
               'spy' => 'فاز الجاسوس!',
@@ -315,27 +328,30 @@ class _SecretReveal extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = context.palette;
 
-    return Row(
-      children: [
-        Expanded(
-          child: _RevealTile(
-            emoji: result.categoryEmoji ?? '🗝️',
-            label: 'الكلمة كانت',
-            value: result.word ?? '—',
-            caption: result.categoryLabel,
-            tone: palette.primary,
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            child: _RevealTile(
+              emoji: result.categoryEmoji ?? '🗝️',
+              label: 'الكلمة كانت',
+              value: result.word ?? '—',
+              caption: result.categoryLabel,
+              tone: palette.primary,
+            ),
           ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _RevealTile(
-            emoji: '🕵️',
-            label: 'الجاسوس كان',
-            value: result.spyUsername ?? '—',
-            tone: palette.accent,
+          const SizedBox(width: 12),
+          Expanded(
+            child: _RevealTile(
+              emoji: '🕵️',
+              label: 'الجاسوس كان',
+              value: result.spyUsername ?? '—',
+              tone: palette.accent,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -360,9 +376,9 @@ class _RevealTile extends StatelessWidget {
     final palette = context.palette;
 
     return SectionCard(
-      color: tone.withValues(alpha: 0.09),
       padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 14),
       child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Text(emoji, style: const TextStyle(fontSize: 30)),
           const SizedBox(height: 8),
@@ -377,7 +393,7 @@ class _RevealTile extends StatelessWidget {
             style: TextStyle(
               fontSize: 21,
               fontWeight: FontWeight.w900,
-              color: palette.textPrimary,
+              color: tone,
             ),
           ),
           if (caption != null) ...[
@@ -402,12 +418,20 @@ class _GuessCard extends StatelessWidget {
     final tone = guess.correct ? palette.accent : palette.primary;
 
     return SectionCard(
-      color: tone.withValues(alpha: 0.08),
       child: Row(
         children: [
-          Text(
-            guess.correct ? '🎯' : '💨',
-            style: const TextStyle(fontSize: 30),
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: tone.withValues(alpha: 0.12),
+              shape: BoxShape.circle,
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              guess.correct ? '🎯' : '💨',
+              style: const TextStyle(fontSize: 24),
+            ),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -442,6 +466,45 @@ class _GuessCard extends StatelessWidget {
   }
 }
 
+class _EjectionsCard extends StatelessWidget {
+  const _EjectionsCard({required this.ejections});
+
+  final List<Ejection> ejections;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+
+    return SectionCard(
+      title: 'مين طلع بأي جولة',
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Column(
+        children: [
+          for (final ejection in ejections)
+            ListTile(
+              dense: true,
+              leading: Text(
+                ejection.wasSpy ? '🕵️' : '🙅',
+                style: const TextStyle(fontSize: 20),
+              ),
+              title: Text(
+                ejection.username,
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: palette.textPrimary,
+                ),
+              ),
+              subtitle: Text(
+                'جولة ${ejection.round} · ${ejection.votes} أصوات',
+                style: TextStyle(color: palette.textMuted, fontSize: 12.5),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
 class _PlayerRow extends StatelessWidget {
   const _PlayerRow({required this.player});
 
@@ -452,12 +515,18 @@ class _PlayerRow extends StatelessWidget {
     final palette = context.palette;
 
     return SectionCard(
-      color: player.wasSpy ? palette.accent.withValues(alpha: 0.09) : null,
+      color: player.wasSpy ? palette.accent.withValues(alpha: 0.08) : null,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       child: Row(
         children: [
-          Text(player.won ? '🏆' : '  ', style: const TextStyle(fontSize: 20)),
-          const SizedBox(width: 8),
+          SizedBox(
+            width: 26,
+            child: Text(
+              player.won ? '🏆' : '',
+              style: const TextStyle(fontSize: 20),
+            ),
+          ),
+          const SizedBox(width: 6),
           PlayerAvatar(
             username: player.username,
             photoUrl: player.photoUrl,
@@ -469,9 +538,11 @@ class _PlayerRow extends StatelessWidget {
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
                   player.username,
+                  maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontWeight: FontWeight.w800,

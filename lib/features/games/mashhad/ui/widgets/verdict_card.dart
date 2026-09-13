@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../../core/theme/app_theme.dart';
 import '../../../../../shared/widgets/common.dart';
+import '../../../../../shared/widgets/skeleton.dart';
 import '../../cubit/mashhad_game_cubit.dart';
 import '../../model/mashhad_models.dart';
 
@@ -23,28 +24,11 @@ class VerdictCard extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          '⚖️ اعتراض',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 23,
-            fontWeight: FontWeight.w900,
-            color: palette.textPrimary,
-          ),
-        ),
-        const SizedBox(height: 18),
         SectionCard(
+          title: '⚖️ اعتراض',
+          subtitle: '${challenge.byUsername} معترض على ادّعاء',
           child: Column(
             children: [
-              Text(
-                '${challenge.byUsername} معترض على ادّعاء',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: palette.textMuted,
-                ),
-              ),
-              const SizedBox(height: 16),
               Text.rich(
                 TextSpan(
                   style: TextStyle(
@@ -64,7 +48,7 @@ class VerdictCard extends StatelessWidget {
                     const TextSpan(text: ' قال إنه حقّق '),
                     TextSpan(
                       text: challenge.kindLabel,
-                      style: const TextStyle(fontWeight: FontWeight.w900),
+                      style: const TextStyle(fontWeight: FontWeight.w800),
                     ),
                     const TextSpan(text: ':'),
                   ],
@@ -79,14 +63,15 @@ class VerdictCard extends StatelessWidget {
                   horizontal: 16,
                 ),
                 decoration: BoxDecoration(
-                  color: palette.surfaceAlt,
-                  borderRadius: BorderRadius.circular(16),
+                  color: palette.background,
+                  borderRadius: BorderRadius.circular(AppRadius.control),
+                  border: Border.all(color: palette.outline),
                 ),
                 child: Text(
                   challenge.goal,
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    fontSize: 18,
+                    fontSize: 17,
                     fontWeight: FontWeight.w800,
                     height: 1.5,
                     color: palette.textPrimary,
@@ -97,12 +82,12 @@ class VerdictCard extends StatelessWidget {
               Text(
                 'فعلاً حقّقه؟',
                 style: TextStyle(
-                  fontSize: 17,
+                  fontSize: 16.5,
                   fontWeight: FontWeight.w800,
                   color: palette.textPrimary,
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 14),
               if (cubit.canVote)
                 Row(
                   children: [
@@ -110,7 +95,7 @@ class VerdictCard extends StatelessWidget {
                       child: _VoteButton(
                         label: 'حقّقه',
                         emoji: '✅',
-                        color: const Color(0xFF2E7D32),
+                        color: palette.success,
                         onTap: () => cubit.vote(achieved: true),
                       ),
                     ),
@@ -119,7 +104,7 @@ class VerdictCard extends StatelessWidget {
                       child: _VoteButton(
                         label: 'لأ',
                         emoji: '❌',
-                        color: palette.accent,
+                        color: palette.danger,
                         onTap: () => cubit.vote(achieved: false),
                       ),
                     ),
@@ -131,7 +116,7 @@ class VerdictCard extends StatelessWidget {
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: palette.surfaceAlt,
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(AppRadius.control),
                   ),
                   child: Text(
                     challenge.isParty
@@ -157,6 +142,37 @@ class VerdictCard extends StatelessWidget {
   }
 }
 
+/// بطاقة الاعتراض قبل وصول تفاصيله — بنفس شكلها كي لا تقفز الشاشة.
+class VerdictCardSkeleton extends StatelessWidget {
+  const VerdictCardSkeleton({super.key});
+
+  @override
+  Widget build(BuildContext context) => const SectionCard(
+    child: Shimmer(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SkeletonLine(widthFactor: 0.35, height: 18),
+          SizedBox(height: 8),
+          SkeletonLine(widthFactor: 0.5),
+          SizedBox(height: 22),
+          SkeletonLine(widthFactor: 0.85, height: 14),
+          SizedBox(height: 14),
+          SkeletonBox(height: 70, radius: 10),
+          SizedBox(height: 22),
+          Row(
+            children: [
+              Expanded(child: SkeletonBox(height: 84, radius: 10)),
+              SizedBox(width: 12),
+              Expanded(child: SkeletonBox(height: 84, radius: 10)),
+            ],
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
 class _VoteButton extends StatelessWidget {
   const _VoteButton({
     required this.label,
@@ -172,16 +188,19 @@ class _VoteButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Material(
-    color: color.withValues(alpha: 0.12),
-    borderRadius: BorderRadius.circular(16),
+    color: color.withValues(alpha: 0.08),
+    clipBehavior: Clip.antiAlias,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(AppRadius.control),
+      side: BorderSide(color: color.withValues(alpha: 0.45)),
+    ),
     child: InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 18),
+        padding: const EdgeInsets.symmetric(vertical: 16),
         child: Column(
           children: [
-            Text(emoji, style: const TextStyle(fontSize: 26)),
+            Text(emoji, style: const TextStyle(fontSize: 24)),
             const SizedBox(height: 6),
             Text(
               label,

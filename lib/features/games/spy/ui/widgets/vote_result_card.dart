@@ -16,37 +16,64 @@ class VoteResultCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
-    final tone = outcome.tie
-        ? palette.textMuted
-        : (outcome.wasSpy ? palette.primary : palette.accent);
+    // مسك الجاسوس وحده يستحق التدرّج: هو اللحظة التي تنتظرها الغرفة كلها.
+    // البريء المطرود والتعادل بطاقة عادية بلون يقول ما حدث.
+    final caught = !outcome.tie && outcome.wasSpy;
+    final tone = outcome.tie ? palette.textMuted : palette.accent;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+    final content = Column(
       children: [
         Text(
           outcome.tie ? '🤷' : (outcome.wasSpy ? '🎉' : '❌'),
           textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 52),
+          style: const TextStyle(fontSize: 48),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 10),
         Text(
           _title(),
           textAlign: TextAlign.center,
           style: TextStyle(
-            fontSize: 23,
+            fontSize: 22,
             fontWeight: FontWeight.w900,
-            color: tone,
+            color: caught ? Colors.white : tone,
           ),
         ),
         const SizedBox(height: 8),
         Text(
           _subtitle(),
           textAlign: TextAlign.center,
-          style: TextStyle(color: palette.textMuted, height: 1.6, fontSize: 14),
+          style: TextStyle(
+            color: caught
+                ? Colors.white.withValues(alpha: 0.9)
+                : palette.textMuted,
+            height: 1.6,
+            fontSize: 14,
+          ),
         ),
-        const SizedBox(height: 24),
-        SectionTitle('الأصوات'),
+      ],
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (caught)
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: palette.headerGradient,
+                begin: AlignmentDirectional.topStart,
+                end: AlignmentDirectional.bottomEnd,
+              ),
+              borderRadius: BorderRadius.circular(AppRadius.card),
+            ),
+            child: content,
+          )
+        else
+          SectionCard(padding: const EdgeInsets.all(24), child: content),
+        const SizedBox(height: 16),
         SectionCard(
+          title: 'الأصوات',
           padding: const EdgeInsets.symmetric(vertical: 6),
           child: Column(
             children: [
@@ -108,10 +135,10 @@ class _VoteBadge extends StatelessWidget {
 
     return Container(
       width: 34,
-      height: 30,
+      height: 28,
       decoration: BoxDecoration(
-        color: tone.withValues(alpha: 0.14),
-        borderRadius: BorderRadius.circular(10),
+        color: tone.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
       ),
       alignment: Alignment.center,
       child: Text(

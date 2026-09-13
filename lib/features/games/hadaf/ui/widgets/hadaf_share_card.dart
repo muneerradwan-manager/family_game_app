@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 
 import '../../../../../core/theme/app_palette.dart';
+import '../../../../../core/theme/app_theme.dart';
 import '../../model/hadaf_models.dart';
 
 /// بطاقة نتيجة الهدف المُعدّة للمشاركة كصورة.
 ///
 /// مرسومة بمقاس ثابت لا بمقاس الشاشة، ولها ألوانها الصريحة لأنها تُرسم خارج
-/// شجرة الواجهة حيث لا يوجد Theme.
+/// شجرة الواجهة حيث لا يوجد Theme — لذلك لا تستعمل أي عنصر مشترك يقرأ
+/// `context.palette` (كـ GradientMark أو SectionCard)، بل ترسم مثيله بنفسها.
 class HadafShareCard extends StatelessWidget {
   const HadafShareCard({
     super.key,
@@ -36,71 +38,88 @@ class HadafShareCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(vertical: 34, horizontal: 28),
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: palette.headerGradient,
-                begin: AlignmentDirectional.topStart,
-                end: AlignmentDirectional.bottomEnd,
-              ),
-              borderRadius: BorderRadius.circular(32),
+              color: palette.surface,
+              borderRadius: BorderRadius.circular(28),
+              border: Border.all(color: palette.outline, width: 2),
             ),
             child: Column(
               children: [
-                const Text('🎯', style: TextStyle(fontSize: 60)),
-                const SizedBox(height: 12),
-                const Text(
+                Container(
+                  width: 104,
+                  height: 104,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: palette.headerGradient,
+                      begin: AlignmentDirectional.topStart,
+                      end: AlignmentDirectional.bottomEnd,
+                    ),
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                  alignment: Alignment.center,
+                  child: const Text('🎯', style: TextStyle(fontSize: 56)),
+                ),
+                const SizedBox(height: 16),
+                Text(
                   'لعبة الهدف',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: palette.textPrimary,
                     fontSize: 38,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 4),
                 Text(
                   channelName,
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.9),
-                    fontSize: 22,
-                  ),
+                  style: TextStyle(color: palette.textMuted, fontSize: 22),
                 ),
                 if (result.winner != null) ...[
                   const SizedBox(height: 20),
-                  Text(
-                    'الفائز: ${result.winner!.username}',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 28,
-                      fontWeight: FontWeight.w900,
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 26,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: palette.primary.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      'الفائز: ${result.winner!.username}',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: palette.primary,
+                        fontSize: 28,
+                        fontWeight: FontWeight.w900,
+                      ),
                     ),
                   ),
                 ],
                 if (result.decidedByTiebreak) ...[
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 12),
                   Text(
                     'حُسمت بجولة الحسم 🔥',
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.9),
-                      fontSize: 20,
-                    ),
+                    style: TextStyle(color: palette.accent, fontSize: 20),
                   ),
                 ],
               ],
             ),
           ),
-          const SizedBox(height: 34),
+          const SizedBox(height: 28),
           for (var index = 0; index < scores.length; index++)
             Container(
               margin: const EdgeInsets.only(bottom: 14),
               padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 22),
               decoration: BoxDecoration(
                 color: index == 0
-                    ? palette.primary.withValues(alpha: 0.10)
+                    ? Color.alphaBlend(
+                        palette.primary.withValues(alpha: 0.08),
+                        palette.surface,
+                      )
                     : palette.surface,
                 borderRadius: BorderRadius.circular(22),
                 border: Border.all(
                   color: index == 0 ? palette.primary : palette.outline,
-                  width: index == 0 ? 2 : 1,
+                  width: 2,
                 ),
               ),
               child: Row(
@@ -115,6 +134,9 @@ class HadafShareCard extends StatelessWidget {
                         _ => '${index + 1}',
                       },
                       style: TextStyle(
+                        fontFamily: index < 3
+                            ? null
+                            : AppTheme.displayFontFamily,
                         fontSize: index < 3 ? 32 : 24,
                         fontWeight: FontWeight.w900,
                         color: palette.textMuted,
@@ -151,9 +173,10 @@ class HadafShareCard extends StatelessWidget {
                   Text(
                     '${scores[index].total}',
                     style: TextStyle(
+                      fontFamily: AppTheme.displayFontFamily,
                       color: palette.textPrimary,
                       fontSize: 34,
-                      fontWeight: FontWeight.w900,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                 ],

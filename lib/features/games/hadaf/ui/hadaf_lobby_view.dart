@@ -3,97 +3,78 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/common.dart';
+import '../../../../shared/widgets/game_layout.dart';
 import '../../../../shared/widgets/responsive.dart';
 import '../../../auth/model/app_user.dart';
 import '../cubit/hadaf_game_cubit.dart';
 import '../model/hadaf_models.dart';
+import 'widgets/hadaf_layout.dart';
 
 /// اللوبي: الأسماء تظهر لحظياً، والمدة المتوقعة تتحدّث مع كل انضمام.
+///
+/// على الشاشة العريضة: اللاعبون شبكة في العمود الرئيسي، والشروط في العمود
+/// الجانبي. على الجوال والتابلت عمود واحد بنفس ترتيب الجوال القديم.
 class HadafLobbyView extends StatelessWidget {
   const HadafLobbyView({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final cubit = context.read<HadafGameCubit>();
     final state = context.watch<HadafGameCubit>().state;
     final snapshot = state.snapshot!;
-    final palette = context.palette;
     final seated = snapshot.seatedPlayers;
+    final split = SessionBody.isSplit(context);
+    final minutes = (snapshot.estimatedSeconds / 60).round();
+
+    final players = _PlayersCard(
+      players: seated,
+      hostId: snapshot.hostId,
+      viewerId: cubit.viewerId,
+    );
+    final notEnough = seated.length < 2;
+    const gap = SizedBox(height: 16);
 
     return Column(
       children: [
-        GradientHeader(
+        SessionHeader(
           title: 'لعبة الهدف',
           subtitle: 'عم ننطر الباقيين...',
-          leading: const Padding(
-            padding: EdgeInsetsDirectional.only(end: 4),
-            child: BackButton(color: Colors.white),
-          ),
-          child: _LobbyMeter(
-            playerCount: seated.length,
-            rounds: snapshot.config.rounds,
-            estimatedSeconds: snapshot.estimatedSeconds,
-          ),
+          emoji: '🎯',
+          stats: [
+            SessionStat('${seated.length}', 'لاعبين'),
+            SessionStat('${snapshot.config.rounds}', 'تحدّي'),
+            SessionStat('~$minutes', 'دقيقة'),
+          ],
         ),
         Expanded(
-          child: ListView(
-            padding: context.contentPadding(),
-            children: [
-              const _HowItWorks(),
-              const SizedBox(height: 20),
-              _ConfigSummary(config: snapshot.config),
-              const SizedBox(height: 20),
-              SectionTitle('اللاعبين (${seated.length})'),
-              SectionCard(
-                padding: const EdgeInsets.symmetric(vertical: 6),
-                child: Column(
-                  children: [
-                    for (final player in seated)
-                      ListTile(
-                        leading: PlayerAvatar(
-                          username: player.username,
-                          photoUrl: player.photoUrl,
-                          avatarId: player.avatarId,
-                          gender: Gender.parse(player.gender),
-                        ),
-                        title: Row(
-                          children: [
-                            Flexible(
-                              child: Text(
-                                player.username,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                  color: palette.textPrimary,
-                                ),
-                              ),
-                            ),
-                            if (player.id == snapshot.hostId) ...[
-                              const SizedBox(width: 8),
-                              const InfoChip('صاحب الغرفة'),
-                            ],
-                          ],
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-              if (seated.length < 2)
-                SectionCard(
-                  color: palette.surfaceAlt,
-                  child: Text(
-                    'بدنا لاعبين على الأقل — السباق ما بينلعب لحالك.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: palette.textMuted, height: 1.5),
-                  ),
-                ),
-            ],
-          ),
-        ),
-        SafeArea(
-          child: Padding(
-            padding: context.contentPadding(top: 4, bottom: 12),
-            child: snapshot.me.isHost
+          child: SessionBody(
+            main: HadafScroll(
+              maxWidth: split ? ContentWidth.wide : ContentWidth.standard,
+              // التذييل (زر ابدأ) هو من يحجز شريط التنقّل.
+              reserveInset: false,
+              children: split
+                  ? [
+                      players,
+                      if (notEnough) ...[gap, const _NotEnoughNotice()],
+                      gap,
+                      const _HowItWorks(),
+                    ]
+                  : [
+                      const _HowItWorks(),
+                      gap,
+                      _ConfigSummary(config: snapshot.config),
+                      gap,
+                      players,
+                      if (notEnough) ...[gap, const _NotEnoughNotice()],
+                    ],
+            ),
+            side: split
+                ? HadafSide(
+                    aboveFooter: true,
+                    children: [_ConfigSummary(config: snapshot.config)],
+                  )
+                : null,
+            footer: snapshot.me.isHost
                 ? FilledButton.icon(
                     onPressed: snapshot.canStart
                         ? () => context.read<HadafGameCubit>().startGame()
@@ -115,76 +96,136 @@ class HadafLobbyView extends StatelessWidget {
   }
 }
 
-class _LobbyMeter extends StatelessWidget {
-  const _LobbyMeter({
-    required this.playerCount,
-    required this.rounds,
-    required this.estimatedSeconds,
+class _PlayersCard extends StatelessWidget {
+  const _PlayersCard({
+    required this.players,
+    required this.hostId,
+    required this.viewerId,
   });
 
-  final int playerCount;
-  final int rounds;
-  final int estimatedSeconds;
+  final List<HadafPlayer> players;
+  final String hostId;
+  final String viewerId;
 
   @override
   Widget build(BuildContext context) {
-    final minutes = (estimatedSeconds / 60).round();
+    final palette = context.palette;
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.18),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
+    return SectionCard(
+      title: 'اللاعبين',
+      trailing: InfoChip('${players.length}', color: palette.textMuted),
+      padding: const EdgeInsets.all(14),
+      child: ResponsiveGrid(
+        minItemWidth: 210,
+        maxColumns: 4,
+        spacing: 10,
         children: [
-          _MeterItem(value: '$playerCount', label: 'لاعبين'),
-          _MeterDivider(),
-          _MeterItem(value: '$rounds', label: 'تحدّي'),
-          _MeterDivider(),
-          _MeterItem(value: '~$minutes', label: 'دقيقة'),
+          for (final player in players)
+            _PlayerTile(
+              player: player,
+              isHost: player.id == hostId,
+              isMe: player.id == viewerId,
+            ),
         ],
       ),
     );
   }
 }
 
-class _MeterItem extends StatelessWidget {
-  const _MeterItem({required this.value, required this.label});
+class _PlayerTile extends StatelessWidget {
+  const _PlayerTile({
+    required this.player,
+    required this.isHost,
+    required this.isMe,
+  });
 
-  final String value;
-  final String label;
+  final HadafPlayer player;
+  final bool isHost;
+  final bool isMe;
 
   @override
-  Widget build(BuildContext context) => Column(
-    children: [
-      Text(
-        value,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 22,
-          fontWeight: FontWeight.w900,
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: isMe ? palette.primary.withValues(alpha: 0.06) : null,
+        borderRadius: BorderRadius.circular(AppRadius.control),
+        border: Border.all(
+          color: isMe
+              ? palette.primary.withValues(alpha: 0.4)
+              : palette.outline,
         ),
       ),
-      Text(
-        label,
-        style: TextStyle(
-          color: Colors.white.withValues(alpha: 0.85),
-          fontSize: 12,
-        ),
+      child: Row(
+        children: [
+          PlayerAvatar(
+            username: player.username,
+            photoUrl: player.photoUrl,
+            avatarId: player.avatarId,
+            gender: Gender.parse(player.gender),
+            size: 40,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  player.username,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: palette.textPrimary,
+                  ),
+                ),
+                if (isHost || isMe) ...[
+                  const SizedBox(height: 3),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    children: [
+                      if (isHost) const InfoChip('صاحب الغرفة'),
+                      if (isMe) InfoChip('إنت', color: palette.textMuted),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
       ),
-    ],
-  );
+    );
+  }
 }
 
-class _MeterDivider extends StatelessWidget {
+class _NotEnoughNotice extends StatelessWidget {
+  const _NotEnoughNotice();
+
   @override
-  Widget build(BuildContext context) => Container(
-    width: 1,
-    height: 32,
-    color: Colors.white.withValues(alpha: 0.3),
-  );
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+
+    return SectionCard(
+      color: palette.warning.withValues(alpha: 0.08),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      child: Row(
+        children: [
+          Icon(Icons.info_outline_rounded, color: palette.warning, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'بدنا لاعبين على الأقل — السباق ما بينلعب لحالك.',
+              style: TextStyle(color: palette.textPrimary, height: 1.5),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _HowItWorks extends StatelessWidget {
@@ -202,32 +243,39 @@ class _HowItWorks extends StatelessWidget {
     ];
 
     return SectionCard(
+      title: 'كيف بتنلعب',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'كيف بتنلعب',
-            style: TextStyle(
-              fontWeight: FontWeight.w800,
-              color: palette.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 12),
-          for (final (emoji, text) in steps)
+          for (final (index, (emoji, text)) in steps.indexed)
             Padding(
-              padding: const EdgeInsets.only(bottom: 10),
+              padding: EdgeInsets.only(
+                bottom: index == steps.length - 1 ? 0 : 12,
+              ),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(emoji, style: const TextStyle(fontSize: 17)),
-                  const SizedBox(width: 10),
+                  Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: palette.surfaceAlt,
+                      borderRadius: BorderRadius.circular(AppRadius.control),
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(emoji, style: const TextStyle(fontSize: 16)),
+                  ),
+                  const SizedBox(width: 12),
                   Expanded(
-                    child: Text(
-                      text,
-                      style: TextStyle(
-                        color: palette.textMuted,
-                        fontSize: 13.5,
-                        height: 1.5,
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 5),
+                      child: Text(
+                        text,
+                        style: TextStyle(
+                          color: palette.textMuted,
+                          fontSize: 13.5,
+                          height: 1.5,
+                        ),
                       ),
                     ),
                   ),
@@ -240,6 +288,7 @@ class _HowItWorks extends StatelessWidget {
   }
 }
 
+/// الشروط كجدول مفتاح/قيمة — كبطاقات التفاصيل في لوحة الإدارة.
 class _ConfigSummary extends StatelessWidget {
   const _ConfigSummary({required this.config});
 
@@ -249,44 +298,68 @@ class _ConfigSummary extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = context.palette;
 
+    final rows = <(IconData, String, Widget)>[
+      (
+        Icons.category_outlined,
+        'المجموعة',
+        InfoChip(
+          config.categoryLabel == null
+              ? '🎲 مزيج'
+              : '${config.categoryEmoji ?? ''} ${config.categoryLabel}',
+        ),
+      ),
+      (
+        Icons.repeat,
+        'التحدّيات',
+        InfoChip('${config.rounds} تحدّي', color: palette.textMuted),
+      ),
+      (
+        Icons.timer_outlined,
+        'وقت السؤال',
+        InfoChip('${config.questionSeconds} ثانية', color: palette.textMuted),
+      ),
+      (
+        Icons.bolt_rounded,
+        'المراهنات',
+        InfoChip('⚡ ${config.risksPerGame} مراهنات', color: palette.accent),
+      ),
+      (
+        Icons.child_care,
+        'الوضع المرن',
+        config.flexibleMode
+            ? InfoChip('الوضع المرن', color: palette.success)
+            : InfoChip('لأ', color: palette.textMuted),
+      ),
+    ];
+
     return SectionCard(
+      title: 'شروط اللعبة',
+      padding: const EdgeInsets.symmetric(vertical: 4),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'شروط اللعبة',
-            style: TextStyle(
-              fontWeight: FontWeight.w800,
-              color: palette.textPrimary,
+          for (final (index, (icon, label, value)) in rows.indexed) ...[
+            if (index > 0) const Divider(indent: 16, endIndent: 16),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+              child: Row(
+                children: [
+                  Icon(icon, size: 18, color: palette.textMuted),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      label,
+                      style: TextStyle(
+                        color: palette.textMuted,
+                        fontSize: 13.5,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Flexible(child: value),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              InfoChip(
-                config.categoryLabel == null
-                    ? '🎲 مزيج'
-                    : '${config.categoryEmoji ?? ''} ${config.categoryLabel}',
-              ),
-              InfoChip('${config.rounds} تحدّي', icon: Icons.repeat),
-              InfoChip(
-                '${config.questionSeconds} ثانية',
-                icon: Icons.timer_outlined,
-              ),
-              InfoChip(
-                '⚡ ${config.risksPerGame} مراهنات',
-                color: palette.accent,
-              ),
-              if (config.flexibleMode)
-                InfoChip(
-                  'الوضع المرن',
-                  color: palette.secondary,
-                  icon: Icons.child_care,
-                ),
-            ],
-          ),
+          ],
         ],
       ),
     );

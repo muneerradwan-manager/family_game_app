@@ -38,34 +38,53 @@ class ResultShareCard extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // رأس أبيض بعلامة متدرّجة صغيرة — نفس لغة شاشات التطبيق، فالصورة
+          // المشتركة تشبه ما رآه اللاعبون.
           Container(
-            padding: const EdgeInsets.symmetric(vertical: 34, horizontal: 28),
+            padding: const EdgeInsets.symmetric(vertical: 30, horizontal: 32),
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: palette.headerGradient,
-                begin: AlignmentDirectional.topStart,
-                end: AlignmentDirectional.bottomEnd,
-              ),
-              borderRadius: BorderRadius.circular(32),
+              color: palette.surface,
+              borderRadius: BorderRadius.circular(28),
+              border: Border.all(color: palette.outline, width: 1.5),
             ),
-            child: Column(
+            child: Row(
               children: [
-                const Text('🔠', style: TextStyle(fontSize: 60)),
-                const SizedBox(height: 12),
-                const Text(
-                  'لعبة الحروف',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 38,
-                    fontWeight: FontWeight.w700,
+                Container(
+                  width: 96,
+                  height: 96,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: palette.headerGradient,
+                      begin: AlignmentDirectional.topStart,
+                      end: AlignmentDirectional.bottomEnd,
+                    ),
+                    borderRadius: BorderRadius.circular(26),
                   ),
+                  alignment: Alignment.center,
+                  child: const Text('🔠', style: TextStyle(fontSize: 50)),
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  channelName,
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.9),
-                    fontSize: 22,
+                const SizedBox(width: 24),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'لعبة الحروف',
+                        style: TextStyle(
+                          color: palette.textPrimary,
+                          fontSize: 38,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        channelName,
+                        style: TextStyle(
+                          color: palette.textMuted,
+                          fontSize: 22,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],

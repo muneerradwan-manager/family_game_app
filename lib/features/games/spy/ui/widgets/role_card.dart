@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../../core/theme/app_theme.dart';
 import '../../../../../shared/widgets/common.dart';
-import '../../../../../shared/widgets/responsive.dart';
+import 'spy_layout.dart';
 
 /// بطاقة الدور السرّي — أول ما يراه اللاعب، ومنها تبدأ اللعبة كلها.
 ///
@@ -56,90 +56,86 @@ class _RoleCardState extends State<RoleCard>
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: SingleChildScrollView(
-        padding: context.contentPadding(
-          top: 24,
-          bottom: 24,
-          minHorizontal: 24,
-          maxWidth: ContentWidth.form,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              widget.isSpectator ? 'إنت عم تتفرج' : 'ورقتك السرّية',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w900,
-                color: context.palette.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              widget.isSpectator
-                  ? 'اللعبة بلّشت — تابع الأسئلة وحاول تكتشفه إنت كمان.'
-                  : 'المجموعة معروفة للكل. الكلمة لأ.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: context.palette.textMuted, height: 1.5),
-            ),
-            const SizedBox(height: 24),
-            if (widget.isSpectator)
-              const _SpectatorCard()
-            else
-              AnimatedBuilder(
-                animation: _flip,
-                builder: (context, _) {
-                  final angle = _flip.value * math.pi;
+    final palette = context.palette;
 
-                  return GestureDetector(
-                    onTap: _reveal,
-                    child: Transform(
-                      alignment: Alignment.center,
-                      transform: Matrix4.identity()
-                        ..setEntry(3, 2, 0.0014)
-                        ..rotateY(angle),
-                      child: angle < math.pi / 2
-                          ? const _CardBack()
-                          : Transform(
-                              alignment: Alignment.center,
-                              // الوجه الثاني يُرسم معكوساً بحكم الدوران؛
-                              // نعكسه مرة ثانية ليُقرأ صحيحاً.
-                              transform: Matrix4.identity()..rotateY(math.pi),
-                              child: _CardFace(
-                                isSpy: widget.isSpy,
-                                word: widget.word,
-                                categoryLabel: widget.categoryLabel,
-                                categoryEmoji: widget.categoryEmoji,
-                              ),
-                            ),
-                    ),
-                  );
-                },
-              ),
-            const SizedBox(height: 20),
-            AnimatedOpacity(
-              opacity: _revealed ? 1 : 0,
-              duration: const Duration(milliseconds: 300),
-              child: Text(
-                widget.isSpy
-                    ? 'مهمتك: استنتج الكلمة من الأسئلة، ومثّل إنك بتعرفها.'
-                    : 'لا تقول الكلمة! جاوب بطريقة تفهّم الباقيين إنك بتعرفها.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: context.palette.textMuted,
-                  height: 1.6,
-                  fontSize: 13.5,
-                ),
-              ),
-            ),
-          ],
+    return SpyStage(
+      centered: true,
+      top: 24,
+      children: [
+        Text(
+          widget.isSpectator ? 'إنت عم تتفرج' : 'ورقتك السرّية',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w800,
+            color: palette.textPrimary,
+          ),
         ),
-      ),
+        const SizedBox(height: 6),
+        Text(
+          widget.isSpectator
+              ? 'اللعبة بلّشت — تابع الأسئلة وحاول تكتشفه إنت كمان.'
+              : 'المجموعة معروفة للكل. الكلمة لأ.',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: palette.textMuted, height: 1.5),
+        ),
+        const SizedBox(height: 22),
+        if (widget.isSpectator)
+          const _SpectatorCard()
+        else
+          AnimatedBuilder(
+            animation: _flip,
+            builder: (context, _) {
+              final angle = _flip.value * math.pi;
+
+              return GestureDetector(
+                onTap: _reveal,
+                child: Transform(
+                  alignment: Alignment.center,
+                  transform: Matrix4.identity()
+                    ..setEntry(3, 2, 0.0014)
+                    ..rotateY(angle),
+                  child: angle < math.pi / 2
+                      ? const _CardBack()
+                      : Transform(
+                          alignment: Alignment.center,
+                          // الوجه الثاني يُرسم معكوساً بحكم الدوران؛
+                          // نعكسه مرة ثانية ليُقرأ صحيحاً.
+                          transform: Matrix4.identity()..rotateY(math.pi),
+                          child: _CardFace(
+                            isSpy: widget.isSpy,
+                            word: widget.word,
+                            categoryLabel: widget.categoryLabel,
+                            categoryEmoji: widget.categoryEmoji,
+                          ),
+                        ),
+                ),
+              );
+            },
+          ),
+        const SizedBox(height: 18),
+        AnimatedOpacity(
+          opacity: _revealed ? 1 : 0,
+          duration: const Duration(milliseconds: 300),
+          child: Text(
+            widget.isSpy
+                ? 'مهمتك: استنتج الكلمة من الأسئلة، ومثّل إنك بتعرفها.'
+                : 'لا تقول الكلمة! جاوب بطريقة تفهّم الباقيين إنك بتعرفها.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: palette.textMuted,
+              height: 1.6,
+              fontSize: 13.5,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
 
+/// ظهر الورقة يبقى بتدرّج الثيم: لحظة الكشف هي اللحظة الدرامية الوحيدة
+/// قبل النتيجة، والتدرّج يقول "هذه ليست بطاقة عادية".
 class _CardBack extends StatelessWidget {
   const _CardBack();
 
@@ -156,12 +152,12 @@ class _CardBack extends StatelessWidget {
           begin: AlignmentDirectional.topStart,
           end: AlignmentDirectional.bottomEnd,
         ),
-        borderRadius: BorderRadius.circular(26),
+        borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: palette.primary.withValues(alpha: 0.32),
-            blurRadius: 26,
-            spreadRadius: 1,
+            color: palette.primary.withValues(alpha: 0.22),
+            blurRadius: 20,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
@@ -176,7 +172,7 @@ class _CardBack extends StatelessWidget {
             style: TextStyle(
               color: Colors.white,
               fontSize: 18,
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w800,
             ),
           ),
           const SizedBox(height: 6),
@@ -216,15 +212,9 @@ class _CardFace extends StatelessWidget {
       height: 230,
       decoration: BoxDecoration(
         color: palette.surface,
-        borderRadius: BorderRadius.circular(26),
-        border: Border.all(color: tone, width: 2.5),
-        boxShadow: [
-          BoxShadow(
-            color: tone.withValues(alpha: 0.22),
-            blurRadius: 22,
-            spreadRadius: 1,
-          ),
-        ],
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: tone, width: 2),
+        boxShadow: AppShadows.card(palette),
       ),
       alignment: Alignment.center,
       child: Column(
@@ -245,10 +235,13 @@ class _CardFace extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 8),
-            Text(
-              'ما بتعرف الكلمة — بس بتعرف إنها ${categoryLabel ?? 'من المجموعة'}',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: palette.textMuted, fontSize: 13),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Text(
+                'ما بتعرف الكلمة — بس بتعرف إنها ${categoryLabel ?? 'من المجموعة'}',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: palette.textMuted, fontSize: 13),
+              ),
             ),
           ] else ...[
             Text(
@@ -282,7 +275,7 @@ class _SpectatorCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => SectionCard(
-    color: context.palette.surfaceAlt,
+    padding: const EdgeInsets.all(24),
     child: Column(
       children: [
         const Text('👀', style: TextStyle(fontSize: 40)),
